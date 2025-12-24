@@ -444,7 +444,7 @@ export default function Training() {
         clearInterval(timerRef.current);
       }
     };
-  }, [isRunning, speed, unvisMode, executeAITurn, initGame, strategyWeights, gamesPlayed]);
+  }, [isRunning, speed, executeAITurn, initGame, strategyWeights, gamesPlayed]);
   
   // Auto-analyze and save every 1000 games
   useEffect(() => {
