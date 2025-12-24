@@ -38,14 +38,24 @@ export default function Card({
   if (faceDown) {
     return (
       <motion.div
-        className={`${baseClasses} rounded-lg bg-gradient-to-br from-blue-700 via-blue-600 to-blue-800 border-2 border-blue-400 shadow-xl flex items-center justify-center`}
+        className={`${baseClasses} rounded-lg bg-gradient-to-br from-red-800 via-red-700 to-red-900 border-2 border-red-500 shadow-xl flex items-center justify-center relative overflow-hidden`}
         style={style}
         initial={{ scale: 0.8, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
         transition={{ type: "spring", stiffness: 300, damping: 20 }}
       >
-        <div className="w-3/4 h-3/4 rounded border-2 border-blue-300 bg-blue-600 flex items-center justify-center">
-          <div className="text-blue-200 text-2xl md:text-3xl font-serif font-bold">♠</div>
+        {/* Pattern background */}
+        <div className="absolute inset-0 opacity-20">
+          <div className="grid grid-cols-3 grid-rows-3 h-full w-full">
+            {[...Array(9)].map((_, i) => (
+              <div key={i} className="flex items-center justify-center text-red-300 text-lg">
+                ♦
+              </div>
+            ))}
+          </div>
+        </div>
+        <div className="w-3/4 h-3/4 rounded-lg border-2 border-amber-400 bg-red-700/50 flex items-center justify-center relative z-10">
+          <div className="text-amber-300 text-2xl md:text-4xl font-serif font-bold">Д</div>
         </div>
       </motion.div>
     );

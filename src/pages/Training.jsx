@@ -55,6 +55,9 @@ export default function Training() {
     successfulAttacks: 0,
     averageCardsLeftInHand: 0
   });
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [analysisProgress, setAnalysisProgress] = useState(0);
+  const [language, setLanguage] = useState('en');
   
   const gameRef = useRef(null);
   const timerRef = useRef(null);
@@ -376,9 +379,27 @@ export default function Training() {
     };
   }, [isRunning, speed, executeAITurn, initGame, strategyWeights, gamesPlayed]);
   
-  // Update AHA score based on actual performance metrics and auto-save
+  // Update AHA score based on actual performance metrics and auto-save every 100 games
   useEffect(() => {
-    if (gamesPlayed > 0 && gamesPlayed % 10 === 0) {
+    if (gamesPlayed > 0 && gamesPlayed % 100 === 0 && !isAnalyzing) {
+      // Pause training for analysis
+      setIsRunning(false);
+      setIsAnalyzing(true);
+      setAnalysisProgress(0);
+      
+      // Simulate analysis with progress bar
+      const analysisInterval = setInterval(() => {
+        setAnalysisProgress(prev => {
+          if (prev >= 100) {
+            clearInterval(analysisInterval);
+            return 100;
+          }
+          return prev + 5;
+        });
+      }, 100);
+      
+      setTimeout(() => {
+        clearInterval(analysisInterval);
       // Calculate performance score based on multiple factors
       const defenseRate = performanceMetrics.totalDefenses > 0 
         ? performanceMetrics.successfulDefenses / performanceMetrics.totalDefenses 
@@ -416,19 +437,33 @@ export default function Training() {
         return newScore;
       });
       
-      // Auto-save every 10 games
-      const currentData = trainingData.length > 0 ? trainingData[0] : {};
-      saveTrainingMutation.mutate({
-        aha_score: ahaScore,
-        games_played: (currentData.games_played || 0) + gamesPlayed,
-        games_won: (currentData.games_won || 0) + stats.ai1Wins + stats.ai2Wins,
-        successful_defenses: (currentData.successful_defenses || 0) + performanceMetrics.successfulDefenses,
-        total_moves: (currentData.total_moves || 0) + performanceMetrics.totalDefenses + performanceMetrics.totalAttacks,
-        strategy_weights: strategyWeights,
-        last_training_date: new Date().toISOString()
-      });
+        // Auto-save after analysis
+        const currentData = trainingData.length > 0 ? trainingData[0] : {};
+        saveTrainingMutation.mutate({
+          aha_score: ahaScore,
+          games_played: (currentData.games_played || 0) + gamesPlayed,
+          games_won: (currentData.games_won || 0) + stats.ai1Wins + stats.ai2Wins,
+          successful_defenses: (currentData.successful_defenses || 0) + performanceMetrics.successfulDefenses,
+          total_moves: (currentData.total_moves || 0) + performanceMetrics.totalDefenses + performanceMetrics.totalAttacks,
+          strategy_weights: strategyWeights,
+          last_training_date: new Date().toISOString()
+        });
+        
+        // Reset counters and resume training
+        setGamesPlayed(0);
+        setStats({ ai1Wins: 0, ai2Wins: 0, draws: 0 });
+        setPerformanceMetrics({
+          totalDefenses: 0,
+          successfulDefenses: 0,
+          totalAttacks: 0,
+          successfulAttacks: 0,
+          averageCardsLeftInHand: 0
+        });
+        setIsAnalyzing(false);
+        setIsRunning(true);
+      }, 2000);
     }
-  }, [gamesPlayed, stats, ahaScore, strategyWeights, trainingData, saveTrainingMutation, performanceMetrics]);
+  }, [gamesPlayed, stats, ahaScore, strategyWeights, trainingData, saveTrainingMutation, performanceMetrics, isAnalyzing]);
   
   const handleSaveProgress = () => {
     const currentData = trainingData.length > 0 ? trainingData[0] : {};
@@ -463,10 +498,21 @@ export default function Training() {
         
         <div className="flex items-center gap-3">
           <Brain className="w-6 h-6 text-purple-400" />
-          <h1 className="text-xl font-bold text-white">AI Training Arena</h1>
+          <h1 className="text-xl font-bold text-white">
+            {language === 'ru' ? 'Арена обучения ИИ' : 'AI Training Arena'}
+          </h1>
         </div>
         
-        <TrumpIndicator suit={gameState.trumpSuit} />
+        <div className="flex items-center gap-3">
+          <Button
+            onClick={() => setLanguage(language === 'en' ? 'ru' : 'en')}
+            variant="outline"
+            className="border-purple-500/50 text-purple-400 hover:bg-purple-500/20 text-sm"
+          >
+            {language === 'en' ? '🇷🇺 Русский' : '🇺🇸 English'}
+          </Button>
+          <TrumpIndicator suit={gameState.trumpSuit} />
+        </div>
       </div>
       
       <div className="max-w-5xl mx-auto">
@@ -478,26 +524,38 @@ export default function Training() {
               <TrendingUp className="w-4 h-4 text-purple-400" />
               <div className="text-2xl font-bold text-purple-400">{ahaScore}</div>
             </div>
-            <div className="text-xs text-slate-400">AHA Score</div>
+            <div className="text-xs text-slate-400">
+              {language === 'ru' ? 'Рейтинг АХА' : 'AHA Score'}
+            </div>
             {ahaScore >= 10000 && (
-              <div className="text-xs text-amber-400 mt-1">🏆 Champion!</div>
+              <div className="text-xs text-amber-400 mt-1">
+                🏆 {language === 'ru' ? 'Чемпион!' : 'Champion!'}
+              </div>
             )}
           </div>
           <div className="bg-slate-800/50 rounded-xl p-4 text-center border border-slate-700">
-            <div className="text-2xl font-bold text-white">{gamesPlayed}</div>
-            <div className="text-xs text-slate-400">Games</div>
+            <div className="text-2xl font-bold text-white">{gamesPlayed}/100</div>
+            <div className="text-xs text-slate-400">
+              {language === 'ru' ? 'Игры' : 'Games'}
+            </div>
           </div>
           <div className="bg-emerald-900/30 rounded-xl p-4 text-center border border-emerald-700/50">
             <div className="text-2xl font-bold text-emerald-400">{stats.ai1Wins}</div>
-            <div className="text-xs text-slate-400">AI 1 Wins</div>
+            <div className="text-xs text-slate-400">
+              {language === 'ru' ? 'Победы ИИ 1' : 'AI 1 Wins'}
+            </div>
           </div>
           <div className="bg-amber-900/30 rounded-xl p-4 text-center border border-amber-700/50">
             <div className="text-2xl font-bold text-amber-400">{stats.ai2Wins}</div>
-            <div className="text-xs text-slate-400">AI 2 Wins</div>
+            <div className="text-xs text-slate-400">
+              {language === 'ru' ? 'Победы ИИ 2' : 'AI 2 Wins'}
+            </div>
           </div>
           <div className="bg-slate-700/50 rounded-xl p-4 text-center border border-slate-600">
             <div className="text-2xl font-bold text-slate-300">{stats.draws}</div>
-            <div className="text-xs text-slate-400">Draws</div>
+            <div className="text-xs text-slate-400">
+              {language === 'ru' ? 'Ничья' : 'Draws'}
+            </div>
           </div>
         </div>
         
@@ -590,16 +648,41 @@ export default function Training() {
           </div>
         </div>
         
-        {/* Current Action */}
+        {/* Current Action or Analysis */}
         <div className="text-center mb-6">
-          <motion.div
-            key={currentAction}
-            className="inline-block px-6 py-3 bg-purple-500/20 rounded-lg border border-purple-500/50 text-purple-300"
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-          >
-            {currentAction}
-          </motion.div>
+          {isAnalyzing ? (
+            <motion.div
+              className="inline-block px-8 py-4 bg-amber-500/20 rounded-lg border border-amber-500/50"
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+            >
+              <div className="text-amber-300 font-bold mb-2">
+                {language === 'ru' ? '⚡ Анализ хода...' : '⚡ Analyzing Moves...'}
+              </div>
+              <div className="w-64 h-3 bg-slate-700 rounded-full overflow-hidden">
+                <motion.div
+                  className="h-full bg-gradient-to-r from-amber-500 to-amber-300"
+                  initial={{ width: 0 }}
+                  animate={{ width: `${analysisProgress}%` }}
+                  transition={{ duration: 0.3 }}
+                />
+              </div>
+              <div className="text-xs text-slate-400 mt-2">
+                {language === 'ru' 
+                  ? `Обработка стратегий... ${analysisProgress}%` 
+                  : `Processing strategies... ${analysisProgress}%`}
+              </div>
+            </motion.div>
+          ) : (
+            <motion.div
+              key={currentAction}
+              className="inline-block px-6 py-3 bg-purple-500/20 rounded-lg border border-purple-500/50 text-purple-300"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+            >
+              {currentAction}
+            </motion.div>
+          )}
         </div>
         
         {/* Controls */}
@@ -610,7 +693,9 @@ export default function Training() {
               className={`gap-2 ${isRunning ? 'bg-red-600 hover:bg-red-700' : 'bg-emerald-600 hover:bg-emerald-700'}`}
             >
               {isRunning ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
-              {isRunning ? 'Pause' : 'Start Training'}
+              {isRunning 
+                ? (language === 'ru' ? 'Пауза' : 'Pause')
+                : (language === 'ru' ? 'Начать обучение' : 'Start Training')}
             </Button>
             
             <Button
@@ -619,7 +704,7 @@ export default function Training() {
               disabled={saveTrainingMutation.isPending}
             >
               <Save className="w-4 h-4" />
-              Save Progress
+              {language === 'ru' ? 'Сохранить' : 'Save Progress'}
             </Button>
             
             <Button
@@ -628,7 +713,7 @@ export default function Training() {
               className="border-slate-600 text-slate-300 gap-2"
             >
               <RotateCcw className="w-4 h-4" />
-              Reset
+              {language === 'ru' ? 'Сбросить' : 'Reset'}
             </Button>
           </div>
           
@@ -648,15 +733,19 @@ export default function Training() {
         
         <div className="text-center text-slate-500 text-sm mt-6 space-y-2">
           <p>
-            Watch AI players compete and learn from each other. The AHA AI learns from every game!
+            {language === 'ru' 
+              ? 'Смотрите, как ИИ соревнуются и учатся друг у друга. ИИ АХА учится на каждой игре!'
+              : 'Watch AI players compete and learn from each other. The AHA AI learns from every game!'}
           </p>
           <p className="text-purple-400">
-            Current Strategy: Aggression {(strategyWeights.aggressive_factor * 100).toFixed(0)}% 
-            | Trump Conservation {(strategyWeights.trump_conservation * 100).toFixed(0)}%
-            {performanceMetrics.totalDefenses > 0 && ` | Defense Rate ${((performanceMetrics.successfulDefenses / performanceMetrics.totalDefenses) * 100).toFixed(0)}%`}
+            {language === 'ru' ? 'Текущая стратегия' : 'Current Strategy'}: {language === 'ru' ? 'Агрессия' : 'Aggression'} {(strategyWeights.aggressive_factor * 100).toFixed(0)}% 
+            | {language === 'ru' ? 'Сохранение козырей' : 'Trump Conservation'} {(strategyWeights.trump_conservation * 100).toFixed(0)}%
+            {performanceMetrics.totalDefenses > 0 && ` | ${language === 'ru' ? 'Успешная защита' : 'Defense Rate'} ${((performanceMetrics.successfulDefenses / performanceMetrics.totalDefenses) * 100).toFixed(0)}%`}
           </p>
           <p className="text-xs text-slate-600">
-            💡 Let it train for 100+ games to reach world champion level (10,000+ AHA Score). Score increases with better defense rates and efficient wins!
+            💡 {language === 'ru' 
+              ? 'Система автоматически обрабатывает данные каждые 100 игр и продолжает обучение. Рейтинг 10,000+ = мирового уровня!'
+              : 'System analyzes data every 100 games and continues training. 10,000+ AHA Score = World Champion Level!'}
           </p>
         </div>
       </div>
