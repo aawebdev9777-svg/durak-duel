@@ -42,7 +42,7 @@ export default function Training() {
   const [gamesPlayed, setGamesPlayed] = useState(0);
   const [stats, setStats] = useState({ ai1Wins: 0, ai2Wins: 0, draws: 0 });
   const [currentAction, setCurrentAction] = useState('');
-  const [ahaScore, setAhaScore] = useState(5000);
+  const [ahaScore, setAhaScore] = useState(0);
   const [strategyWeights, setStrategyWeights] = useState({
     aggressive_factor: 1.0,
     trump_conservation: 1.0,
@@ -88,7 +88,7 @@ export default function Training() {
   useEffect(() => {
     if (trainingData.length > 0) {
       const data = trainingData[0];
-      setAhaScore(data.aha_score || 5000);
+      setAhaScore(data.aha_score || 0);
       if (data.strategy_weights) {
         setStrategyWeights(data.strategy_weights);
       }
@@ -411,11 +411,11 @@ export default function Training() {
       // Combined performance (0-1 scale)
       const overallPerformance = (defenseRate * 0.6 + efficiencyScore * 0.4);
       
-      // Score delta: -200 to +200 based on how well AI is playing
-      const scoreDelta = Math.floor((overallPerformance - 0.5) * 400);
+      // Score delta: +1 to +5 per 100 games based on performance (slow progression)
+      const scoreDelta = Math.floor(overallPerformance * 5);
       
       setAhaScore(prev => {
-        const newScore = Math.max(1000, Math.min(20000, prev + scoreDelta));
+        const newScore = Math.max(0, Math.min(20000, prev + scoreDelta));
         
         // Evolve strategies based on score thresholds
         if (newScore > 8000) {
@@ -517,7 +517,7 @@ export default function Training() {
       
       <div className="max-w-5xl mx-auto">
         {/* Stats */}
-        <div className="grid grid-cols-5 gap-4 mb-6">
+        <div className="grid grid-cols-6 gap-3 mb-6">
           <div className="bg-purple-900/40 rounded-xl p-4 text-center border border-purple-700/50 relative overflow-hidden">
             <div className="absolute top-0 right-0 w-16 h-16 bg-purple-500/20 rounded-full blur-2xl" />
             <div className="relative flex items-center justify-center gap-2 mb-1">
@@ -555,6 +555,14 @@ export default function Training() {
             <div className="text-2xl font-bold text-slate-300">{stats.draws}</div>
             <div className="text-xs text-slate-400">
               {language === 'ru' ? 'Ничья' : 'Draws'}
+            </div>
+          </div>
+          <div className="bg-blue-900/30 rounded-xl p-4 text-center border border-blue-700/50">
+            <div className="text-2xl font-bold text-blue-400">
+              {((trainingData[0]?.games_played || 0) + gamesPlayed)}
+            </div>
+            <div className="text-xs text-slate-400">
+              {language === 'ru' ? 'Всего игр' : 'Total Games'}
             </div>
           </div>
         </div>
@@ -744,8 +752,8 @@ export default function Training() {
           </p>
           <p className="text-xs text-slate-600">
             💡 {language === 'ru' 
-              ? 'Система автоматически обрабатывает данные каждые 100 игр и продолжает обучение. Рейтинг 10,000+ = мирового уровня!'
-              : 'System analyzes data every 100 games and continues training. 10,000+ AHA Score = World Champion Level!'}
+              ? 'Система автоматически обрабатывает данные каждые 100 игр. АХА начинается с 0 и медленно растёт с тысячами игр. 10,000+ = мирового уровня!'
+              : 'System analyzes every 100 games. AHA starts at 0 and grows slowly over thousands of games. 10,000+ = World Champion!'}
           </p>
         </div>
       </div>

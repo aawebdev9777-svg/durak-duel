@@ -189,10 +189,10 @@ export default function Home() {
                 
                 <div className="flex items-center gap-2 mb-2 text-purple-400/80 text-sm">
                   <Sparkles className="w-4 h-4" />
-                  <span>AHA Score: Loading...</span>
+                  <span>Current AHA Score: Loading...</span>
                 </div>
                 <div className="text-xs text-slate-500 mb-4">
-                  10,000+ = World Champion Level
+                  Starts at 0 | Grows with thousands of training games | 10,000+ = World Champion
                 </div>
                 
                 <Link to={createPageUrl('Training')}>

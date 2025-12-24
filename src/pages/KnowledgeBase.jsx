@@ -90,7 +90,7 @@ export default function KnowledgeBase() {
                 <span className="text-xs text-purple-400">PERFORMANCE</span>
               </div>
               <div className="text-3xl font-bold text-white mb-1">
-                {currentData?.aha_score || 5000}
+                {currentData?.aha_score || 0}
               </div>
               <div className="text-sm text-slate-400">AHA Score</div>
             </CardContent>
