@@ -295,7 +295,7 @@ export default function Training() {
     };
   }, [isRunning, speed, executeAITurn, initGame, strategyWeights]);
   
-  // Update AHA score based on performance
+  // Update AHA score based on performance and auto-save
   useEffect(() => {
     if (gamesPlayed > 0 && gamesPlayed % 10 === 0) {
       const winRate = (stats.ai1Wins + stats.ai2Wins) / gamesPlayed;
@@ -315,8 +315,18 @@ export default function Training() {
         
         return newScore;
       });
+      
+      // Auto-save every 10 games
+      const currentData = trainingData.length > 0 ? trainingData[0] : {};
+      saveTrainingMutation.mutate({
+        aha_score: ahaScore,
+        games_played: (currentData.games_played || 0) + gamesPlayed,
+        games_won: (currentData.games_won || 0) + stats.ai1Wins + stats.ai2Wins,
+        strategy_weights: strategyWeights,
+        last_training_date: new Date().toISOString()
+      });
     }
-  }, [gamesPlayed, stats]);
+  }, [gamesPlayed, stats, ahaScore, strategyWeights, trainingData, saveTrainingMutation]);
   
   const handleSaveProgress = () => {
     const currentData = trainingData.length > 0 ? trainingData[0] : {};
@@ -525,8 +535,8 @@ export default function Training() {
             <Slider
               value={[2000 - speed]}
               min={0}
-              max={1800}
-              step={100}
+              max={1990}
+              step={10}
               onValueChange={([v]) => setSpeed(2000 - v)}
               className="flex-1"
             />
