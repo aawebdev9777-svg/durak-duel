@@ -253,6 +253,13 @@ export default function Training() {
           
           const allDefended = newTableCards.every(p => p.defense);
           
+          // Track defense success
+          setPerformanceMetrics(prev => ({
+            ...prev,
+            totalDefenses: prev.totalDefenses + 1,
+            successfulDefenses: prev.successfulDefenses + 1
+          }));
+          
           const newState = {
             ...state,
             hands: newHands,
@@ -263,6 +270,12 @@ export default function Training() {
           setCurrentAction(`AI ${aiPlayer + 1} defends with ${defenseCard.rank} of ${defenseCard.suit}`);
           return { state: newState };
         } else {
+          // Track failed defense
+          setPerformanceMetrics(prev => ({
+            ...prev,
+            totalDefenses: prev.totalDefenses + 1
+          }));
+          
           setCurrentAction(`AI ${aiPlayer + 1} takes cards`);
           return endRound(true);
         }
@@ -270,7 +283,7 @@ export default function Training() {
     }
     
     return null;
-  }, [endRound]);
+  }, [endRound, strategyWeights]);
   
   useEffect(() => {
     if (!isRunning) {
@@ -318,7 +331,7 @@ export default function Training() {
         clearInterval(timerRef.current);
       }
     };
-  }, [isRunning, speed, executeAITurn, initGame, strategyWeights]);
+  }, [isRunning, speed, executeAITurn, initGame, strategyWeights, gamesPlayed]);
   
   // Update AHA score based on actual performance metrics and auto-save
   useEffect(() => {
