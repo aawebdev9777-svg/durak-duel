@@ -38,14 +38,14 @@ export default function Card({
   if (faceDown) {
     return (
       <motion.div
-        className={`${baseClasses} rounded-lg bg-gradient-to-br from-blue-900 via-blue-800 to-blue-900 border-2 border-blue-700 shadow-lg flex items-center justify-center`}
+        className={`${baseClasses} rounded-lg bg-gradient-to-br from-blue-700 via-blue-600 to-blue-800 border-2 border-blue-400 shadow-xl flex items-center justify-center`}
         style={style}
         initial={{ scale: 0.8, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
         transition={{ type: "spring", stiffness: 300, damping: 20 }}
       >
-        <div className="w-3/4 h-3/4 rounded border border-blue-600 bg-blue-800 flex items-center justify-center">
-          <div className="text-blue-400 text-xl font-serif">♠</div>
+        <div className="w-3/4 h-3/4 rounded border-2 border-blue-300 bg-blue-600 flex items-center justify-center">
+          <div className="text-blue-200 text-2xl md:text-3xl font-serif font-bold">♠</div>
         </div>
       </motion.div>
     );
@@ -53,12 +53,12 @@ export default function Card({
 
   return (
     <motion.div
-      className={`${baseClasses} rounded-lg bg-gradient-to-br from-cream-50 to-cream-100 border border-gray-200 shadow-lg cursor-pointer flex flex-col p-1.5 md:p-2 relative overflow-hidden
-        ${selectable ? 'hover:shadow-xl hover:-translate-y-2 transition-all' : ''}
-        ${selected ? 'ring-2 ring-amber-500 -translate-y-3' : ''}
+      className={`${baseClasses} rounded-lg bg-gradient-to-br from-white via-gray-50 to-gray-100 border-2 border-gray-400 shadow-xl cursor-pointer flex flex-col p-1.5 md:p-2 relative overflow-hidden
+        ${selectable ? 'hover:shadow-2xl hover:-translate-y-2 transition-all hover:border-amber-400' : ''}
+        ${selected ? 'ring-4 ring-amber-500 -translate-y-3 border-amber-400' : ''}
       `}
       style={{ 
-        backgroundColor: '#FDF5E6',
+        backgroundColor: '#FFFFFF',
         ...style 
       }}
       onClick={selectable ? onClick : undefined}

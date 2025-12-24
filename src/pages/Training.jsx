@@ -118,6 +118,8 @@ export default function Training() {
   
   useEffect(() => {
     initGame();
+    // Auto-start training
+    setIsRunning(true);
   }, [initGame]);
   
   const endRound = useCallback((defenderTook = false) => {
@@ -190,6 +192,20 @@ export default function Training() {
           const newHands = [...state.hands];
           newHands[aiPlayer] = newHands[aiPlayer].filter(c => c.id !== attackCard.id);
           
+          // Log attack knowledge
+          base44.entities.AIKnowledge.create({
+            game_id: `game_${Date.now()}`,
+            move_number: 1,
+            game_phase: 'attack',
+            card_played: attackCard,
+            hand_size: newHands[aiPlayer].length,
+            decision_type: 'attack',
+            was_successful: true,
+            reward: 0.3,
+            aha_score_at_time: ahaScore,
+            strategy_snapshot: strategyWeights
+          }).catch(() => {});
+          
           const newState = {
             ...state,
             hands: newHands,
@@ -260,6 +276,20 @@ export default function Training() {
             successfulDefenses: prev.successfulDefenses + 1
           }));
           
+          // Log knowledge
+          base44.entities.AIKnowledge.create({
+            game_id: `game_${Date.now()}`,
+            move_number: state.tableCards.length,
+            game_phase: 'defend',
+            card_played: defenseCard,
+            hand_size: newHands[aiPlayer].length,
+            decision_type: 'defense',
+            was_successful: true,
+            reward: 0.5,
+            aha_score_at_time: ahaScore,
+            strategy_snapshot: strategyWeights
+          }).catch(() => {});
+          
           const newState = {
             ...state,
             hands: newHands,
@@ -275,6 +305,19 @@ export default function Training() {
             ...prev,
             totalDefenses: prev.totalDefenses + 1
           }));
+          
+          // Log failed defense knowledge
+          base44.entities.AIKnowledge.create({
+            game_id: `game_${Date.now()}`,
+            move_number: state.tableCards.length,
+            game_phase: 'defend',
+            hand_size: state.hands[aiPlayer].length,
+            decision_type: 'take',
+            was_successful: false,
+            reward: -0.8,
+            aha_score_at_time: ahaScore,
+            strategy_snapshot: strategyWeights
+          }).catch(() => {});
           
           setCurrentAction(`AI ${aiPlayer + 1} takes cards`);
           return endRound(true);

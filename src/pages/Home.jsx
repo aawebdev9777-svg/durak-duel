@@ -11,7 +11,8 @@ import {
   Brain, 
   ChevronRight,
   Crown,
-  Sparkles
+  Sparkles,
+  Database
 } from 'lucide-react';
 
 const suitSymbols = ['♠', '♥', '♦', '♣'];
@@ -225,12 +226,20 @@ export default function Home() {
                     </p>
                   </div>
                 </div>
-                <Link to={createPageUrl('Training')}>
-                  <Button variant="outline" className="border-purple-500/50 text-purple-400 hover:bg-purple-500/20 gap-2">
-                    <Brain className="w-4 h-4" />
-                    Watch Training
-                  </Button>
-                </Link>
+                <div className="flex gap-2">
+                  <Link to={createPageUrl('KnowledgeBase')}>
+                    <Button variant="outline" className="border-blue-500/50 text-blue-400 hover:bg-blue-500/20 gap-2">
+                      <Database className="w-4 h-4" />
+                      Knowledge Base
+                    </Button>
+                  </Link>
+                  <Link to={createPageUrl('Training')}>
+                    <Button variant="outline" className="border-purple-500/50 text-purple-400 hover:bg-purple-500/20 gap-2">
+                      <Brain className="w-4 h-4" />
+                      Watch Training
+                    </Button>
+                  </Link>
+                </div>
               </div>
             </CardContent>
           </Card>
