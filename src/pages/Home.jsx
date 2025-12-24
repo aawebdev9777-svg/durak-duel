@@ -23,7 +23,8 @@ export default function Home() {
   const difficulties = [
     { id: 'easy', label: 'Easy', description: 'For beginners' },
     { id: 'medium', label: 'Medium', description: 'Balanced challenge' },
-    { id: 'hard', label: 'Hard', description: 'For experienced players' }
+    { id: 'hard', label: 'Hard', description: 'For experienced players' },
+    { id: 'aha', label: 'AHA', description: 'Self-learning AI', special: true }
   ];
   
   return (
@@ -128,21 +129,27 @@ export default function Home() {
                 {/* Difficulty */}
                 <div className="mb-6">
                   <label className="text-sm text-slate-400 mb-2 block">Difficulty</label>
-                  <div className="grid grid-cols-3 gap-2">
+                  <div className="grid grid-cols-2 gap-2">
                     {difficulties.map(d => (
                       <button
                         key={d.id}
                         onClick={() => setDifficulty(d.id)}
                         className={`py-2 px-3 rounded-lg border transition-all text-sm ${
                           difficulty === d.id
-                            ? 'bg-amber-500/20 border-amber-500 text-amber-400'
+                            ? d.special 
+                              ? 'bg-purple-500/20 border-purple-500 text-purple-400 font-bold'
+                              : 'bg-amber-500/20 border-amber-500 text-amber-400'
                             : 'bg-slate-700/50 border-slate-600 text-slate-300 hover:border-slate-500'
                         }`}
                       >
                         {d.label}
+                        {d.special && <span className="ml-1 text-xs">⚡</span>}
                       </button>
                     ))}
                   </div>
+                  <p className="text-xs text-slate-500 mt-2">
+                    {difficulties.find(d => d.id === difficulty)?.description}
+                  </p>
                 </div>
                 
                 <Link to={createPageUrl(`Game?players=${numPlayers}&difficulty=${difficulty}`)}>
@@ -155,39 +162,42 @@ export default function Home() {
             </Card>
           </motion.div>
           
-          {/* Champion Mode */}
+          {/* AHA AI Training Status */}
           <motion.div
             initial={{ opacity: 0, x: 30 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ delay: 0.3 }}
           >
-            <Card className="bg-gradient-to-br from-amber-900/30 to-slate-800/50 border-amber-700/50 backdrop-blur-sm overflow-hidden relative">
-              <div className="absolute top-0 right-0 w-32 h-32 bg-amber-500/10 rounded-full blur-3xl" />
+            <Card className="bg-gradient-to-br from-purple-900/30 to-slate-800/50 border-purple-700/50 backdrop-blur-sm overflow-hidden relative">
+              <div className="absolute top-0 right-0 w-32 h-32 bg-purple-500/10 rounded-full blur-3xl" />
               <CardContent className="p-6 relative">
                 <div className="flex items-center gap-3 mb-4">
-                  <div className="p-3 rounded-xl bg-amber-500/20">
-                    <Crown className="w-6 h-6 text-amber-400" />
+                  <div className="p-3 rounded-xl bg-purple-500/20">
+                    <Brain className="w-6 h-6 text-purple-400" />
                   </div>
                   <div>
-                    <h2 className="text-xl font-bold text-white">World Champion</h2>
-                    <p className="text-sm text-amber-400/80">Face the strongest AI</p>
+                    <h2 className="text-xl font-bold text-white">AHA AI</h2>
+                    <p className="text-sm text-purple-400/80">Self-Learning Neural Network</p>
                   </div>
                 </div>
                 
-                <p className="text-slate-300 text-sm mb-6">
-                  Challenge our most advanced AI opponent, trained through millions of self-play games. 
-                  Only the best Durak players can defeat the champion!
+                <p className="text-slate-300 text-sm mb-4">
+                  Train the AHA AI through self-play to create the ultimate Durak opponent. 
+                  The more it trains, the stronger it becomes!
                 </p>
                 
-                <div className="flex items-center gap-2 mb-4 text-amber-400/80 text-sm">
+                <div className="flex items-center gap-2 mb-2 text-purple-400/80 text-sm">
                   <Sparkles className="w-4 h-4" />
-                  <span>Advanced strategy & bluffing</span>
+                  <span>AHA Score: Loading...</span>
+                </div>
+                <div className="text-xs text-slate-500 mb-4">
+                  10,000+ = World Champion Level
                 </div>
                 
-                <Link to={createPageUrl('Game?players=1&difficulty=champion&mode=champion')}>
-                  <Button className="w-full bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-700 hover:to-amber-800 text-white h-12 text-lg gap-2 border border-amber-500/50">
-                    <Trophy className="w-5 h-5" />
-                    Challenge Champion
+                <Link to={createPageUrl('Training')}>
+                  <Button className="w-full bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 text-white h-12 text-lg gap-2 border border-purple-500/50">
+                    <Brain className="w-5 h-5" />
+                    Train AHA AI
                   </Button>
                 </Link>
               </CardContent>

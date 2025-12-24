@@ -176,7 +176,7 @@ export default function Game() {
       const state = gameRef.current;
       if (!state) return;
       
-      const aiDifficulty = isChampionMode ? 'champion' : difficulty;
+      const aiDifficulty = difficulty;
       
       if (state.phase === 'attack') {
         // AI attacking

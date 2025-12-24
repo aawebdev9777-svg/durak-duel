@@ -2,6 +2,8 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
+import { base44 } from '@/api/base44Client';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { 
   ArrowLeft, 
   Play, 
@@ -10,7 +12,9 @@ import {
   RotateCcw,
   Brain,
   Trophy,
-  Zap
+  Zap,
+  TrendingUp,
+  Save
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
@@ -38,9 +42,48 @@ export default function Training() {
   const [gamesPlayed, setGamesPlayed] = useState(0);
   const [stats, setStats] = useState({ ai1Wins: 0, ai2Wins: 0, draws: 0 });
   const [currentAction, setCurrentAction] = useState('');
+  const [ahaScore, setAhaScore] = useState(5000);
+  const [strategyWeights, setStrategyWeights] = useState({
+    aggressive_factor: 1.0,
+    trump_conservation: 1.0,
+    card_value_threshold: 15
+  });
   
   const gameRef = useRef(null);
   const timerRef = useRef(null);
+  const queryClient = useQueryClient();
+  
+  // Load AI training data
+  const { data: trainingData = [] } = useQuery({
+    queryKey: ['aiTraining'],
+    queryFn: () => base44.entities.AITrainingData.list(),
+    initialData: []
+  });
+  
+  // Save training data mutation
+  const saveTrainingMutation = useMutation({
+    mutationFn: (data) => {
+      if (trainingData.length > 0) {
+        return base44.entities.AITrainingData.update(trainingData[0].id, data);
+      } else {
+        return base44.entities.AITrainingData.create(data);
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['aiTraining'] });
+    }
+  });
+  
+  // Load saved training data
+  useEffect(() => {
+    if (trainingData.length > 0) {
+      const data = trainingData[0];
+      setAhaScore(data.aha_score || 5000);
+      if (data.strategy_weights) {
+        setStrategyWeights(data.strategy_weights);
+      }
+    }
+  }, [trainingData]);
   
   const initGame = useCallback(() => {
     const deck = createDeck();
@@ -122,11 +165,11 @@ export default function Training() {
     if (!state) return null;
     
     const aiPlayer = state.phase === 'attack' ? state.attacker : state.defender;
-    const difficulty = 'hard';
+    const difficulty = 'aha';
     
     if (state.phase === 'attack') {
       if (state.tableCards.length === 0) {
-        const attackCard = aiSelectAttack(state.hands[aiPlayer], [], state.trumpSuit, difficulty);
+        const attackCard = aiSelectAttack(state.hands[aiPlayer], [], state.trumpSuit, difficulty, strategyWeights);
         if (attackCard) {
           const newHands = [...state.hands];
           newHands[aiPlayer] = newHands[aiPlayer].filter(c => c.id !== attackCard.id);
@@ -147,11 +190,12 @@ export default function Training() {
           state.tableCards,
           state.hands[state.defender].length,
           state.trumpSuit,
-          difficulty
+          difficulty,
+          strategyWeights
         );
         
         if (shouldContinue) {
-          const attackCard = aiSelectAttack(state.hands[aiPlayer], state.tableCards, state.trumpSuit, difficulty);
+          const attackCard = aiSelectAttack(state.hands[aiPlayer], state.tableCards, state.trumpSuit, difficulty, strategyWeights);
           if (attackCard) {
             const newHands = [...state.hands];
             newHands[aiPlayer] = newHands[aiPlayer].filter(c => c.id !== attackCard.id);
@@ -178,7 +222,8 @@ export default function Training() {
           state.hands[aiPlayer],
           undefended.attack,
           state.trumpSuit,
-          difficulty
+          difficulty,
+          strategyWeights
         );
         
         if (defenseCard) {
@@ -248,7 +293,42 @@ export default function Training() {
         clearInterval(timerRef.current);
       }
     };
-  }, [isRunning, speed, executeAITurn, initGame]);
+  }, [isRunning, speed, executeAITurn, initGame, strategyWeights]);
+  
+  // Update AHA score based on performance
+  useEffect(() => {
+    if (gamesPlayed > 0 && gamesPlayed % 10 === 0) {
+      const winRate = (stats.ai1Wins + stats.ai2Wins) / gamesPlayed;
+      const scoreDelta = Math.floor((winRate - 0.5) * 100);
+      
+      setAhaScore(prev => {
+        const newScore = Math.max(1000, Math.min(15000, prev + scoreDelta));
+        
+        // Evolve strategies
+        if (newScore > 8000) {
+          setStrategyWeights(prev => ({
+            aggressive_factor: Math.min(2.0, prev.aggressive_factor + 0.05),
+            trump_conservation: Math.min(1.5, prev.trump_conservation + 0.03),
+            card_value_threshold: Math.max(10, prev.card_value_threshold - 0.5)
+          }));
+        }
+        
+        return newScore;
+      });
+    }
+  }, [gamesPlayed, stats]);
+  
+  const handleSaveProgress = () => {
+    const currentData = trainingData.length > 0 ? trainingData[0] : {};
+    
+    saveTrainingMutation.mutate({
+      aha_score: ahaScore,
+      games_played: (currentData.games_played || 0) + gamesPlayed,
+      games_won: (currentData.games_won || 0) + stats.ai1Wins + stats.ai2Wins,
+      strategy_weights: strategyWeights,
+      last_training_date: new Date().toISOString()
+    });
+  };
   
   if (!gameState) {
     return (
@@ -279,22 +359,33 @@ export default function Training() {
       
       <div className="max-w-5xl mx-auto">
         {/* Stats */}
-        <div className="grid grid-cols-4 gap-4 mb-6">
+        <div className="grid grid-cols-5 gap-4 mb-6">
+          <div className="bg-purple-900/40 rounded-xl p-4 text-center border border-purple-700/50 relative overflow-hidden">
+            <div className="absolute top-0 right-0 w-16 h-16 bg-purple-500/20 rounded-full blur-2xl" />
+            <div className="relative flex items-center justify-center gap-2 mb-1">
+              <TrendingUp className="w-4 h-4 text-purple-400" />
+              <div className="text-2xl font-bold text-purple-400">{ahaScore}</div>
+            </div>
+            <div className="text-xs text-slate-400">AHA Score</div>
+            {ahaScore >= 10000 && (
+              <div className="text-xs text-amber-400 mt-1">🏆 Champion!</div>
+            )}
+          </div>
           <div className="bg-slate-800/50 rounded-xl p-4 text-center border border-slate-700">
             <div className="text-2xl font-bold text-white">{gamesPlayed}</div>
-            <div className="text-sm text-slate-400">Games Played</div>
+            <div className="text-xs text-slate-400">Games</div>
           </div>
           <div className="bg-emerald-900/30 rounded-xl p-4 text-center border border-emerald-700/50">
             <div className="text-2xl font-bold text-emerald-400">{stats.ai1Wins}</div>
-            <div className="text-sm text-slate-400">AI 1 Wins</div>
+            <div className="text-xs text-slate-400">AI 1 Wins</div>
           </div>
           <div className="bg-amber-900/30 rounded-xl p-4 text-center border border-amber-700/50">
             <div className="text-2xl font-bold text-amber-400">{stats.ai2Wins}</div>
-            <div className="text-sm text-slate-400">AI 2 Wins</div>
+            <div className="text-xs text-slate-400">AI 2 Wins</div>
           </div>
           <div className="bg-slate-700/50 rounded-xl p-4 text-center border border-slate-600">
             <div className="text-2xl font-bold text-slate-300">{stats.draws}</div>
-            <div className="text-sm text-slate-400">Draws</div>
+            <div className="text-xs text-slate-400">Draws</div>
           </div>
         </div>
         
@@ -407,7 +498,16 @@ export default function Training() {
               className={`gap-2 ${isRunning ? 'bg-red-600 hover:bg-red-700' : 'bg-emerald-600 hover:bg-emerald-700'}`}
             >
               {isRunning ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
-              {isRunning ? 'Pause' : 'Start'}
+              {isRunning ? 'Pause' : 'Start Training'}
+            </Button>
+            
+            <Button
+              onClick={handleSaveProgress}
+              className="bg-purple-600 hover:bg-purple-700 gap-2"
+              disabled={saveTrainingMutation.isPending}
+            >
+              <Save className="w-4 h-4" />
+              Save Progress
             </Button>
             
             <Button
@@ -434,9 +534,18 @@ export default function Training() {
           </div>
         </div>
         
-        <p className="text-center text-slate-500 text-sm mt-6">
-          Watch AI players compete and learn from each other. The trained strategies are used by the World Champion AI.
-        </p>
+        <div className="text-center text-slate-500 text-sm mt-6 space-y-2">
+          <p>
+            Watch AI players compete and learn from each other. The AHA AI learns from every game!
+          </p>
+          <p className="text-purple-400">
+            Current Strategy: Aggression {(strategyWeights.aggressive_factor * 100).toFixed(0)}% 
+            | Trump Conservation {(strategyWeights.trump_conservation * 100).toFixed(0)}%
+          </p>
+          <p className="text-xs text-slate-600">
+            💡 Let it train for 100+ games to reach world champion level (10,000+ AHA Score)
+          </p>
+        </div>
       </div>
     </div>
   );

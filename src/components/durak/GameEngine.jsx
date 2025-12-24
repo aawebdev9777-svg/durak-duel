@@ -97,31 +97,37 @@ export function refillHands(hands, deck, startingPlayer) {
 }
 
 // AI Logic
-export function evaluateCard(card, trumpSuit, hand) {
+export function evaluateCard(card, trumpSuit, hand, strategyWeights = null) {
   let score = card.rank;
+  
+  const weights = strategyWeights || {
+    aggressive_factor: 1.0,
+    trump_conservation: 1.0,
+    card_value_threshold: 15
+  };
   
   // Trump cards are more valuable to keep
   if (card.suit === trumpSuit) {
-    score += 20;
+    score += 20 * weights.trump_conservation;
   }
   
   // Cards we have pairs of are good for attacking
   const sameRankCount = hand.filter(c => c.rank === card.rank).length;
   if (sameRankCount > 1) {
-    score -= 5; // Slightly prefer playing these
+    score -= 5 * weights.aggressive_factor;
   }
   
   return score;
 }
 
-export function aiSelectAttack(hand, tableCards, trumpSuit, difficulty) {
+export function aiSelectAttack(hand, tableCards, trumpSuit, difficulty, strategyWeights = null) {
   const validCards = getValidAttackCards(hand, tableCards);
   if (validCards.length === 0) return null;
   
   // Sort by value (lower = better to play first)
   const sorted = [...validCards].sort((a, b) => {
-    const scoreA = evaluateCard(a, trumpSuit, hand);
-    const scoreB = evaluateCard(b, trumpSuit, hand);
+    const scoreA = evaluateCard(a, trumpSuit, hand, strategyWeights);
+    const scoreB = evaluateCard(b, trumpSuit, hand, strategyWeights);
     return scoreA - scoreB;
   });
   
@@ -131,9 +137,29 @@ export function aiSelectAttack(hand, tableCards, trumpSuit, difficulty) {
   } else if (difficulty === 'medium') {
     const topHalf = sorted.slice(0, Math.ceil(sorted.length / 2));
     return topHalf[Math.floor(Math.random() * topHalf.length)];
+  } else if (difficulty === 'aha') {
+    // AHA mode - uses learned strategies
+    const rankCounts = {};
+    validCards.forEach(c => {
+      rankCounts[c.rank] = (rankCounts[c.rank] || 0) + 1;
+    });
+    
+    const weights = strategyWeights || { aggressive_factor: 1.5, trump_conservation: 1.3, card_value_threshold: 12 };
+    
+    // Advanced multi-attack strategy
+    const multiAttack = validCards.filter(c => rankCounts[c.rank] > 1);
+    if (multiAttack.length > 0 && Math.random() > (0.2 / weights.aggressive_factor)) {
+      return multiAttack.sort((a, b) => evaluateCard(a, trumpSuit, hand, weights) - evaluateCard(b, trumpSuit, hand, weights))[0];
+    }
+    
+    // Consider hand size and game state
+    if (hand.length > 8) {
+      return sorted[0]; // Play conservatively with many cards
+    }
+    
+    return sorted[Math.floor(Math.random() * Math.min(2, sorted.length))];
   } else {
     // Hard/Champion - play optimally with some strategy
-    // Prefer cards of same rank for multi-attack
     const rankCounts = {};
     validCards.forEach(c => {
       rankCounts[c.rank] = (rankCounts[c.rank] || 0) + 1;
@@ -141,21 +167,21 @@ export function aiSelectAttack(hand, tableCards, trumpSuit, difficulty) {
     
     const multiAttack = validCards.filter(c => rankCounts[c.rank] > 1);
     if (multiAttack.length > 0 && Math.random() > 0.3) {
-      return multiAttack.sort((a, b) => evaluateCard(a, trumpSuit, hand) - evaluateCard(b, trumpSuit, hand))[0];
+      return multiAttack.sort((a, b) => evaluateCard(a, trumpSuit, hand, strategyWeights) - evaluateCard(b, trumpSuit, hand, strategyWeights))[0];
     }
     
     return sorted[0];
   }
 }
 
-export function aiSelectDefense(hand, attackCard, trumpSuit, difficulty) {
+export function aiSelectDefense(hand, attackCard, trumpSuit, difficulty, strategyWeights = null) {
   const validCards = getValidDefenseCards(hand, attackCard, trumpSuit);
   if (validCards.length === 0) return null;
   
   // Sort by value (lower = better to use for defense)
   const sorted = [...validCards].sort((a, b) => {
-    const scoreA = evaluateCard(a, trumpSuit, hand);
-    const scoreB = evaluateCard(b, trumpSuit, hand);
+    const scoreA = evaluateCard(a, trumpSuit, hand, strategyWeights);
+    const scoreB = evaluateCard(b, trumpSuit, hand, strategyWeights);
     return scoreA - scoreB;
   });
   
@@ -166,12 +192,26 @@ export function aiSelectDefense(hand, attackCard, trumpSuit, difficulty) {
   } else if (difficulty === 'medium') {
     if (Math.random() < 0.1) return null;
     return sorted[0];
+  } else if (difficulty === 'aha') {
+    // AHA mode - advanced defense logic
+    const lowestDefense = sorted[0];
+    const attackValue = evaluateCard(attackCard, trumpSuit, [], strategyWeights);
+    const defenseValue = evaluateCard(lowestDefense, trumpSuit, hand, strategyWeights);
+    
+    const weights = strategyWeights || { card_value_threshold: 12 };
+    
+    // Strategic decision on whether to defend
+    if (defenseValue > attackValue + weights.card_value_threshold && hand.length > 3) {
+      if (Math.random() < 0.15) return null; // Sometimes still takes calculated risks
+    }
+    
+    // Minimal defense - don't overspend
+    return sorted[0];
   } else {
     // Hard/Champion - optimal defense
-    // Consider if it's worth defending
     const lowestDefense = sorted[0];
-    const attackValue = evaluateCard(attackCard, trumpSuit, []);
-    const defenseValue = evaluateCard(lowestDefense, trumpSuit, hand);
+    const attackValue = evaluateCard(attackCard, trumpSuit, [], strategyWeights);
+    const defenseValue = evaluateCard(lowestDefense, trumpSuit, hand, strategyWeights);
     
     // Don't waste high trumps on low attacks early game
     if (defenseValue > attackValue + 15 && hand.length > 4) {
@@ -182,7 +222,7 @@ export function aiSelectDefense(hand, attackCard, trumpSuit, difficulty) {
   }
 }
 
-export function aiShouldContinueAttack(hand, tableCards, defenderHandSize, trumpSuit, difficulty) {
+export function aiShouldContinueAttack(hand, tableCards, defenderHandSize, trumpSuit, difficulty, strategyWeights = null) {
   const validCards = getValidAttackCards(hand, tableCards);
   if (validCards.length === 0) return false;
   
@@ -193,10 +233,14 @@ export function aiShouldContinueAttack(hand, tableCards, defenderHandSize, trump
   if (difficulty === 'easy') {
     return Math.random() < 0.3;
   } else if (difficulty === 'medium') {
-    return Math.random() < 0.5 && validCards.some(c => evaluateCard(c, trumpSuit, hand) < 15);
+    return Math.random() < 0.5 && validCards.some(c => evaluateCard(c, trumpSuit, hand, strategyWeights) < 15);
+  } else if (difficulty === 'aha') {
+    const weights = strategyWeights || { aggressive_factor: 1.5, card_value_threshold: 12 };
+    const lowValueCards = validCards.filter(c => evaluateCard(c, trumpSuit, hand, weights) < weights.card_value_threshold);
+    return lowValueCards.length > 0 && Math.random() < (0.75 * weights.aggressive_factor);
   } else {
     // Champion - strategic continuation
-    const lowValueCards = validCards.filter(c => evaluateCard(c, trumpSuit, hand) < 12);
+    const lowValueCards = validCards.filter(c => evaluateCard(c, trumpSuit, hand, strategyWeights) < 12);
     return lowValueCards.length > 0 && Math.random() < 0.7;
   }
 }
