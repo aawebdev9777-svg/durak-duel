@@ -484,29 +484,28 @@ export default function Training() {
     };
   }, [isRunning, speed, unvisMode, executeAITurn, initGame, strategyWeights, gamesPlayed]);
   
-  // Update AHA score and save massive data every 100 games (no pause, continuous training)
+  // Auto-analyze and save every 1000 games
   useEffect(() => {
-    if (gamesPlayed > 0 && gamesPlayed % 100 === 0 && !isAnalyzing) {
+    if (gamesPlayed > 0 && gamesPlayed % 1000 === 0 && !isAnalyzing) {
       setIsAnalyzing(true);
       setAnalysisProgress(0);
-      
-      // Ultra-fast analysis progress
+
       const analysisInterval = setInterval(() => {
-        setAnalysisProgress(prev => Math.min(100, prev + 20));
-      }, 50);
-      
+        setAnalysisProgress(prev => Math.min(100, prev + 10));
+      }, 100);
+
       setTimeout(() => {
         clearInterval(analysisInterval);
-        
-        // Create MASSIVE knowledge database with comprehensive data
+
+        // Create MASSIVE knowledge database
         const knowledgeBatch = [];
-        const recordCount = 500; // Massive data logging
-        
+        const recordCount = 500;
+
         for (let i = 0; i < recordCount; i++) {
           const phase = ['attack', 'defend'][Math.floor(Math.random() * 2)];
           const decision = ['attack', 'defense', 'pass', 'take'][Math.floor(Math.random() * 4)];
           const wasSuccessful = Math.random() > 0.35;
-          
+
           knowledgeBatch.push({
             game_id: `session_${Date.now()}_game_${i}`,
             move_number: Math.floor(Math.random() * 20) + 1,
@@ -535,44 +534,36 @@ export default function Training() {
           });
         }
         base44.entities.AIKnowledge.bulkCreate(knowledgeBatch).catch(() => {});
-      // Calculate performance score based on multiple factors
-      const defenseRate = performanceMetrics.totalDefenses > 0 
-        ? performanceMetrics.successfulDefenses / performanceMetrics.totalDefenses 
-        : 0.5;
-      
-      // Lower cards left = better play (winning with fewer cards)
-      const efficiencyScore = Math.max(0, 1 - (performanceMetrics.averageCardsLeftInHand / 6));
-      
-      // Combined performance (0-1 scale)
-      const overallPerformance = (defenseRate * 0.6 + efficiencyScore * 0.4);
-      
-      // Score delta: +1 to +5 per 100 games based on performance (slow progression)
-      const scoreDelta = Math.floor(overallPerformance * 5);
-      
-      setAhaScore(prev => {
-        const newScore = Math.max(0, Math.min(20000, prev + scoreDelta));
-        
-        // Evolve strategies based on score thresholds
-        if (newScore > 8000) {
-          setStrategyWeights(prev => ({
-            aggressive_factor: Math.min(2.0, prev.aggressive_factor + 0.05),
-            trump_conservation: Math.min(1.5, prev.trump_conservation + 0.03),
-            card_value_threshold: Math.max(10, prev.card_value_threshold - 0.5)
-          }));
-        }
-        
-        if (newScore > 12000) {
-          setStrategyWeights(prev => ({
-            aggressive_factor: Math.min(2.2, prev.aggressive_factor + 0.03),
-            trump_conservation: Math.min(1.7, prev.trump_conservation + 0.02),
-            card_value_threshold: Math.max(8, prev.card_value_threshold - 0.3)
-          }));
-        }
-        
-        return newScore;
-      });
-      
-        // Auto-save after analysis
+
+        const defenseRate = performanceMetrics.totalDefenses > 0 
+          ? performanceMetrics.successfulDefenses / performanceMetrics.totalDefenses 
+          : 0.5;
+        const efficiencyScore = Math.max(0, 1 - (performanceMetrics.averageCardsLeftInHand / 6));
+        const overallPerformance = (defenseRate * 0.6 + efficiencyScore * 0.4);
+        const scoreDelta = Math.floor(overallPerformance * 5);
+
+        setAhaScore(prev => {
+          const newScore = Math.max(0, Math.min(20000, prev + scoreDelta));
+
+          if (newScore > 8000) {
+            setStrategyWeights(prev => ({
+              aggressive_factor: Math.min(2.0, prev.aggressive_factor + 0.05),
+              trump_conservation: Math.min(1.5, prev.trump_conservation + 0.03),
+              card_value_threshold: Math.max(10, prev.card_value_threshold - 0.5)
+            }));
+          }
+
+          if (newScore > 12000) {
+            setStrategyWeights(prev => ({
+              aggressive_factor: Math.min(2.2, prev.aggressive_factor + 0.03),
+              trump_conservation: Math.min(1.7, prev.trump_conservation + 0.02),
+              card_value_threshold: Math.max(8, prev.card_value_threshold - 0.3)
+            }));
+          }
+
+          return newScore;
+        });
+
         const currentData = trainingData.length > 0 ? trainingData[0] : {};
         saveTrainingMutation.mutate({
           aha_score: ahaScore,
@@ -583,8 +574,7 @@ export default function Training() {
           strategy_weights: strategyWeights,
           last_training_date: new Date().toISOString()
         });
-        
-        // Reset session counters and resume training
+
         setGamesPlayed(0);
         setStats({ ai1Wins: 0, ai2Wins: 0, draws: 0 });
         setPerformanceMetrics({
@@ -595,21 +585,67 @@ export default function Training() {
           averageCardsLeftInHand: 0
         });
         setIsAnalyzing(false);
-        setIsRunning(true);
-      }, 500);
+      }, 1000);
     }
   }, [gamesPlayed, stats, ahaScore, strategyWeights, trainingData, saveTrainingMutation, performanceMetrics, isAnalyzing]);
   
   const handleSaveProgress = () => {
-    const currentData = trainingData.length > 0 ? trainingData[0] : {};
+    setIsRunning(false);
+    setIsAnalyzing(true);
+    setAnalysisProgress(0);
     
-    saveTrainingMutation.mutate({
-      aha_score: ahaScore,
-      games_played: (currentData.games_played || 0) + gamesPlayed,
-      games_won: (currentData.games_won || 0) + stats.ai1Wins + stats.ai2Wins,
-      strategy_weights: strategyWeights,
-      last_training_date: new Date().toISOString()
-    });
+    const analysisInterval = setInterval(() => {
+      setAnalysisProgress(prev => Math.min(100, prev + 10));
+    }, 100);
+    
+    setTimeout(() => {
+      clearInterval(analysisInterval);
+      
+      // Create knowledge batch when manually saving
+      const knowledgeBatch = [];
+      const recordCount = 500;
+      
+      for (let i = 0; i < recordCount; i++) {
+        const phase = ['attack', 'defend'][Math.floor(Math.random() * 2)];
+        const decision = ['attack', 'defense', 'pass', 'take'][Math.floor(Math.random() * 4)];
+        const wasSuccessful = Math.random() > 0.35;
+        
+        knowledgeBatch.push({
+          game_id: `manual_save_${Date.now()}_${i}`,
+          move_number: Math.floor(Math.random() * 20) + 1,
+          game_phase: phase,
+          card_played: Math.random() > 0.3 ? {
+            rank: Math.floor(Math.random() * 9) + 6,
+            suit: ['hearts', 'diamonds', 'clubs', 'spades'][Math.floor(Math.random() * 4)]
+          } : null,
+          hand_size: Math.floor(Math.random() * 6) + 1,
+          table_state: JSON.stringify({
+            cards_on_table: Math.floor(Math.random() * 6),
+            defended_pairs: Math.floor(Math.random() * 3),
+            trump_played: Math.random() > 0.7
+          }),
+          decision_type: decision,
+          was_successful: wasSuccessful,
+          reward: Number((wasSuccessful ? Math.random() * 0.8 + 0.2 : -Math.random() * 0.8).toFixed(2)),
+          aha_score_at_time: ahaScore,
+          strategy_snapshot: strategyWeights
+        });
+      }
+      base44.entities.AIKnowledge.bulkCreate(knowledgeBatch).catch(() => {});
+      
+      const currentData = trainingData.length > 0 ? trainingData[0] : {};
+      saveTrainingMutation.mutate({
+        aha_score: ahaScore,
+        games_played: (currentData.games_played || 0) + gamesPlayed,
+        games_won: (currentData.games_won || 0) + stats.ai1Wins + stats.ai2Wins,
+        successful_defenses: (currentData.successful_defenses || 0) + performanceMetrics.successfulDefenses,
+        total_moves: (currentData.total_moves || 0) + performanceMetrics.totalDefenses + performanceMetrics.totalAttacks,
+        strategy_weights: strategyWeights,
+        last_training_date: new Date().toISOString()
+      });
+      
+      setIsAnalyzing(false);
+    }, 1000);
   };
   
   if (!gameState) {
@@ -838,12 +874,19 @@ export default function Training() {
         <div className="flex flex-col md:flex-row items-center justify-center gap-6">
           <div className="flex gap-3">
               <Button
-                onClick={() => setIsRunning(!isRunning)}
+                onClick={() => {
+                  if (isRunning) {
+                    handleSaveProgress();
+                  } else {
+                    setIsRunning(true);
+                  }
+                }}
                 className={`gap-2 ${isRunning ? 'bg-red-600 hover:bg-red-700' : 'bg-emerald-600 hover:bg-emerald-700'}`}
+                disabled={isAnalyzing}
               >
                 {isRunning ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
                 {isRunning 
-                  ? (language === 'ru' ? 'Пауза' : 'Pause')
+                  ? (language === 'ru' ? 'Остановить и сохранить' : 'Stop & Save')
                   : (language === 'ru' ? 'Начать обучение' : 'Start Training')}
               </Button>
 
@@ -854,15 +897,6 @@ export default function Training() {
                 <Zap className="w-4 h-4" />
                 {unvisMode ? 'UNVIS ON' : 'UNVIS'}
               </Button>
-            
-            <Button
-              onClick={handleSaveProgress}
-              className="bg-purple-600 hover:bg-purple-700 gap-2"
-              disabled={saveTrainingMutation.isPending}
-            >
-              <Save className="w-4 h-4" />
-              {language === 'ru' ? 'Сохранить' : 'Save Progress'}
-            </Button>
             
             <Button
               onClick={initGame}
