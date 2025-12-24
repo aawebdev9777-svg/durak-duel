@@ -61,6 +61,7 @@ export default function Training() {
   
   const gameRef = useRef(null);
   const timerRef = useRef(null);
+  const isRunningRef = useRef(false);
   const queryClient = useQueryClient();
   
   // Load AI training data
@@ -341,6 +342,8 @@ export default function Training() {
   }, [endRound, strategyWeights]);
   
   useEffect(() => {
+    isRunningRef.current = isRunning;
+    
     if (!isRunning) {
       if (timerRef.current) {
         clearInterval(timerRef.current);
@@ -388,8 +391,9 @@ export default function Training() {
     if (speed === 0) {
       // Maximum speed - run continuously without delay
       const runContinuous = () => {
+        if (!isRunningRef.current) return; // Check ref immediately
         runTurn();
-        if (isRunning) {
+        if (isRunningRef.current) {
           setTimeout(runContinuous, 0);
         }
       };
@@ -505,7 +509,7 @@ export default function Training() {
           last_training_date: new Date().toISOString()
         });
         
-        // Reset session counters and continue training (NO PAUSE)
+        // Reset session counters and resume training
         setGamesPlayed(0);
         setStats({ ai1Wins: 0, ai2Wins: 0, draws: 0 });
         setPerformanceMetrics({
@@ -516,7 +520,7 @@ export default function Training() {
           averageCardsLeftInHand: 0
         });
         setIsAnalyzing(false);
-        // Keep running - no pause!
+        setIsRunning(true);
       }, 500);
     }
   }, [gamesPlayed, stats, ahaScore, strategyWeights, trainingData, saveTrainingMutation, performanceMetrics, isAnalyzing]);
