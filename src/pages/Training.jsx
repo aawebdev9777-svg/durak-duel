@@ -739,7 +739,7 @@ export default function Training() {
         </div>
         
         {/* Game Visualization */}
-        {!unvisMode && (
+        {!unvisMode && speed > 0 && (
         <div className="bg-slate-800/30 rounded-2xl border border-slate-700 p-6 mb-6">
           {/* AI 1 */}
           <div className="flex justify-center mb-6">
