@@ -288,6 +288,12 @@ export default function Game() {
       });
       setSelectedCard(null);
       setGameMessage('Waiting for defense...');
+    } else if (gameState.phase === 'defend' && gameState.defender === 0) {
+      // Find first undefended card
+      const undefendedIndex = gameState.tableCards.findIndex(p => !p.defense);
+      if (undefendedIndex !== -1) {
+        handleDefend(undefendedIndex);
+      }
     }
   };
   
