@@ -31,7 +31,7 @@ export default function KnowledgeBase() {
   // Load AI knowledge (moves/decisions)
   const { data: knowledgeData = [] } = useQuery({
     queryKey: ['aiKnowledge'],
-    queryFn: () => base44.entities.AIKnowledge.list('-created_date', 100),
+    queryFn: () => base44.entities.AIKnowledge.list('-created_date', 500),
     initialData: []
   });
   
@@ -55,6 +55,12 @@ export default function KnowledgeBase() {
   const filteredKnowledge = selectedFilter === 'all' 
     ? knowledgeData 
     : knowledgeData.filter(k => k.decision_type === selectedFilter);
+    
+  // Find best cards/decisions
+  const bestDecisions = [...knowledgeData]
+    .filter(k => k.card_played && k.reward > 0)
+    .sort((a, b) => b.reward - a.reward)
+    .slice(0, 10);
   
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-900 via-purple-950 to-slate-900 p-4">
@@ -196,13 +202,13 @@ export default function KnowledgeBase() {
           </Card>
         )}
         
-        {/* Move Statistics */}
+        {/* Stats Section */}
         <Card className="bg-slate-800/40 border-slate-700/50">
           <CardHeader>
             <CardTitle className="flex items-center justify-between text-white">
               <div className="flex items-center gap-2">
                 <Zap className="w-5 h-5 text-amber-400" />
-                Decision Statistics
+                Stats
               </div>
               <div className="text-sm font-normal text-slate-400">
                 Avg Reward: <span className="text-purple-400 font-bold">{stats.avgReward}</span>
@@ -230,6 +236,73 @@ export default function KnowledgeBase() {
                 <div className="text-sm text-slate-400">Failed</div>
               </div>
             </div>
+          </CardContent>
+        </Card>
+        
+        {/* Best Cards Section */}
+        <Card className="bg-gradient-to-br from-amber-900/40 to-amber-800/30 border-amber-700/50">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-white">
+              <Award className="w-5 h-5 text-amber-400" />
+              Best Cards - Top Performing Decisions
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {bestDecisions.length === 0 ? (
+              <div className="text-center py-8 text-slate-500">
+                No successful card plays logged yet. Train more to see best decisions!
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {bestDecisions.map((decision, idx) => (
+                  <motion.div
+                    key={decision.id}
+                    className="bg-slate-800/50 rounded-lg p-4 border border-amber-600/30"
+                    initial={{ opacity: 0, x: -20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: idx * 0.05 }}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-4">
+                        <div className="bg-amber-500/20 rounded-full w-10 h-10 flex items-center justify-center">
+                          <span className="text-amber-400 font-bold">#{idx + 1}</span>
+                        </div>
+                        <div>
+                          <div className="text-white font-bold text-lg mb-1">
+                            {decision.card_played.rank} of {decision.card_played.suit}
+                          </div>
+                          <div className="flex items-center gap-3 text-sm">
+                            <span className={`${
+                              decision.decision_type === 'attack' ? 'text-red-400' : 'text-blue-400'
+                            }`}>
+                              {decision.decision_type.toUpperCase()}
+                            </span>
+                            <span className="text-slate-500">•</span>
+                            <span className="text-slate-400">Hand: {decision.hand_size} cards</span>
+                            <span className="text-slate-500">•</span>
+                            <span className="text-slate-400">Move #{decision.move_number}</span>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <div className="text-2xl font-bold text-emerald-400">
+                          +{decision.reward.toFixed(2)}
+                        </div>
+                        <div className="text-xs text-slate-500">reward</div>
+                      </div>
+                    </div>
+                    <div className="mt-3 pt-3 border-t border-slate-700">
+                      <div className="text-xs text-slate-400">
+                        <span className="text-amber-400 font-bold">Why it's best:</span> High reward score indicates this move led to successful outcomes. 
+                        {decision.reward > 0.7 && " Exceptional strategic value! "}
+                        {decision.decision_type === 'defense' && decision.reward > 0.4 && "Perfect defense timing. "}
+                        AHA Score: {decision.aha_score_at_time || 0}
+                      </div>
+                    </div>
+                  </motion.div>
+                ))}
+              </div>
+            )}
           </CardContent>
         </Card>
         
