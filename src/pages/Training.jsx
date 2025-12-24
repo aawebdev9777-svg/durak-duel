@@ -428,17 +428,18 @@ export default function Training() {
       setTimeout(() => {
         clearInterval(analysisInterval);
         
-        // Create bulk knowledge records for analysis
+        // Create bulk knowledge records for analysis (more at max speed)
+        const recordCount = speed === 0 ? 200 : 50;
         const knowledgeBatch = [];
-        for (let i = 0; i < 50; i++) {
+        for (let i = 0; i < recordCount; i++) {
           knowledgeBatch.push({
-            game_id: `analysis_${gamesPlayed}_${i}`,
+            game_id: `analysis_batch_${Date.now()}_${i}`,
             move_number: i,
             game_phase: i % 2 === 0 ? 'attack' : 'defend',
             hand_size: Math.floor(Math.random() * 6) + 1,
             decision_type: ['attack', 'defense', 'pass', 'take'][Math.floor(Math.random() * 4)],
             was_successful: Math.random() > 0.3,
-            reward: (Math.random() - 0.5) * 2,
+            reward: Number(((Math.random() - 0.5) * 2).toFixed(2)),
             aha_score_at_time: ahaScore,
             strategy_snapshot: strategyWeights
           });
@@ -611,7 +612,8 @@ export default function Training() {
           </div>
         </div>
         
-        {/* Game Visualization */}
+        {/* Game Visualization - Hidden at max speed for performance */}
+        {speed > 0 && (
         <div className="bg-slate-800/30 rounded-2xl border border-slate-700 p-6 mb-6">
           {/* AI 1 */}
           <div className="flex justify-center mb-6">
@@ -699,6 +701,22 @@ export default function Training() {
             </div>
           </div>
         </div>
+        )}
+        
+        {/* Max Speed Indicator */}
+        {speed === 0 && !isAnalyzing && (
+          <div className="text-center mb-6">
+            <div className="inline-block px-8 py-4 bg-red-500/20 rounded-lg border border-red-500/50">
+              <div className="text-red-300 font-bold text-lg flex items-center gap-2">
+                <Zap className="w-6 h-6" />
+                {language === 'ru' ? '⚡ МАКСИМАЛЬНАЯ СКОРОСТЬ' : '⚡ MAX SPEED MODE'}
+              </div>
+              <div className="text-slate-400 text-sm mt-1">
+                {language === 'ru' ? 'Визуализация отключена для производительности' : 'Visualization hidden for performance'}
+              </div>
+            </div>
+          </div>
+        )}
         
         {/* Current Action or Analysis */}
         <div className="text-center mb-6">
