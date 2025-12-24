@@ -39,6 +39,7 @@ export default function Training() {
   const [gameState, setGameState] = useState(null);
   const [isRunning, setIsRunning] = useState(false);
   const [speed, setSpeed] = useState(1000);
+  const [unvisMode, setUnvisMode] = useState(false);
   const [gamesPlayed, setGamesPlayed] = useState(0);
   const [stats, setStats] = useState({ ai1Wins: 0, ai2Wins: 0, draws: 0 });
   const [currentAction, setCurrentAction] = useState('');
@@ -388,10 +389,24 @@ export default function Training() {
       }
     };
     
-    if (speed === 0) {
+    if (unvisMode) {
+      // UNVIS MODE - ABSOLUTE MAXIMUM SPEED, NO DELAYS, TIGHT LOOP
+      const runUnvis = () => {
+        if (!isRunningRef.current) return;
+        // Run multiple turns in single frame
+        for (let i = 0; i < 100; i++) {
+          if (!isRunningRef.current) break;
+          runTurn();
+        }
+        if (isRunningRef.current) {
+          requestAnimationFrame(runUnvis);
+        }
+      };
+      requestAnimationFrame(runUnvis);
+    } else if (speed === 0) {
       // Maximum speed - run continuously without delay
       const runContinuous = () => {
-        if (!isRunningRef.current) return; // Check ref immediately
+        if (!isRunningRef.current) return;
         runTurn();
         if (isRunningRef.current) {
           setTimeout(runContinuous, 0);
@@ -628,6 +643,7 @@ export default function Training() {
         </div>
         
         {/* Game Visualization */}
+        {!unvisMode && (
         <div className="bg-slate-800/30 rounded-2xl border border-slate-700 p-6 mb-6">
           {/* AI 1 */}
           <div className="flex justify-center mb-6">
@@ -715,6 +731,22 @@ export default function Training() {
             </div>
           </div>
         </div>
+        )}
+        
+        {/* UNVIS MODE Indicator */}
+        {unvisMode && !isAnalyzing && (
+          <div className="text-center mb-6">
+            <div className="inline-block px-8 py-6 bg-gradient-to-r from-purple-900/40 to-red-900/40 rounded-xl border-2 border-purple-500/50 animate-pulse">
+              <div className="text-purple-300 font-bold text-2xl flex items-center gap-3 mb-2">
+                <Zap className="w-8 h-8 animate-spin" />
+                ⚡ UNVIS MODE ⚡
+              </div>
+              <div className="text-slate-300 text-sm">
+                {language === 'ru' ? 'МАКСИМАЛЬНАЯ СКОРОСТЬ | БЕЗ ВИЗУАЛИЗАЦИИ' : 'MAXIMUM SPEED | NO VISUALIZATION'}
+              </div>
+            </div>
+          </div>
+        )}
         
         {/* Current Action or Analysis */}
         <div className="text-center mb-6">
@@ -745,15 +777,23 @@ export default function Training() {
         {/* Controls */}
         <div className="flex flex-col md:flex-row items-center justify-center gap-6">
           <div className="flex gap-3">
-            <Button
-              onClick={() => setIsRunning(!isRunning)}
-              className={`gap-2 ${isRunning ? 'bg-red-600 hover:bg-red-700' : 'bg-emerald-600 hover:bg-emerald-700'}`}
-            >
-              {isRunning ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
-              {isRunning 
-                ? (language === 'ru' ? 'Пауза' : 'Pause')
-                : (language === 'ru' ? 'Начать обучение' : 'Start Training')}
-            </Button>
+              <Button
+                onClick={() => setIsRunning(!isRunning)}
+                className={`gap-2 ${isRunning ? 'bg-red-600 hover:bg-red-700' : 'bg-emerald-600 hover:bg-emerald-700'}`}
+              >
+                {isRunning ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
+                {isRunning 
+                  ? (language === 'ru' ? 'Пауза' : 'Pause')
+                  : (language === 'ru' ? 'Начать обучение' : 'Start Training')}
+              </Button>
+
+              <Button
+                onClick={() => setUnvisMode(!unvisMode)}
+                className={`gap-2 ${unvisMode ? 'bg-purple-600 hover:bg-purple-700 animate-pulse' : 'bg-slate-700 hover:bg-slate-600'}`}
+              >
+                <Zap className="w-4 h-4" />
+                {unvisMode ? 'UNVIS ON' : 'UNVIS'}
+              </Button>
             
             <Button
               onClick={handleSaveProgress}
@@ -783,8 +823,11 @@ export default function Training() {
               step={1}
               onValueChange={([v]) => setSpeed(1000 - v)}
               className="flex-1"
+              disabled={unvisMode}
             />
-            <span className="text-sm text-slate-400 min-w-16">{speed === 0 ? 'MAX' : `${speed}ms`}</span>
+            <span className="text-sm text-slate-400 min-w-16">
+              {unvisMode ? 'UNVIS' : speed === 0 ? 'MAX' : `${speed}ms`}
+            </span>
           </div>
         </div>
         
