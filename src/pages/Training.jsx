@@ -48,6 +48,13 @@ export default function Training() {
     trump_conservation: 1.0,
     card_value_threshold: 15
   });
+  const [performanceMetrics, setPerformanceMetrics] = useState({
+    totalDefenses: 0,
+    successfulDefenses: 0,
+    totalAttacks: 0,
+    successfulAttacks: 0,
+    averageCardsLeftInHand: 0
+  });
   
   const gameRef = useRef(null);
   const timerRef = useRef(null);
@@ -134,7 +141,16 @@ export default function Training() {
     const result = checkGameOver(refilledHands, deckEmpty);
     
     if (result.over) {
-      return { gameOver: true, durak: result.durak, hands: refilledHands };
+      // Track performance for AHA scoring
+      const winnerHands = refilledHands.filter((h, i) => i !== result.durak);
+      const avgCardsLeft = winnerHands.reduce((sum, h) => sum + h.length, 0) / Math.max(1, winnerHands.length);
+      
+      return { 
+        gameOver: true, 
+        durak: result.durak, 
+        hands: refilledHands,
+        performanceData: { avgCardsLeft }
+      };
     }
     
     let nextAttacker, nextDefender;
@@ -276,6 +292,15 @@ export default function Training() {
             ai2Wins: result.durak === 0 ? prev.ai2Wins + 1 : prev.ai2Wins,
             draws: result.durak === null ? prev.draws + 1 : prev.draws
           }));
+          
+          // Track game performance
+          if (result.performanceData) {
+            setPerformanceMetrics(prev => ({
+              ...prev,
+              averageCardsLeftInHand: (prev.averageCardsLeftInHand * (gamesPlayed) + result.performanceData.avgCardsLeft) / (gamesPlayed + 1)
+            }));
+          }
+          
           setCurrentAction(result.durak !== null 
             ? `Game Over! AI ${result.durak + 1} is the Durak!` 
             : 'Game Over! Draw!');
@@ -295,21 +320,40 @@ export default function Training() {
     };
   }, [isRunning, speed, executeAITurn, initGame, strategyWeights]);
   
-  // Update AHA score based on performance and auto-save
+  // Update AHA score based on actual performance metrics and auto-save
   useEffect(() => {
     if (gamesPlayed > 0 && gamesPlayed % 10 === 0) {
-      const winRate = (stats.ai1Wins + stats.ai2Wins) / gamesPlayed;
-      const scoreDelta = Math.floor((winRate - 0.5) * 100);
+      // Calculate performance score based on multiple factors
+      const defenseRate = performanceMetrics.totalDefenses > 0 
+        ? performanceMetrics.successfulDefenses / performanceMetrics.totalDefenses 
+        : 0.5;
+      
+      // Lower cards left = better play (winning with fewer cards)
+      const efficiencyScore = Math.max(0, 1 - (performanceMetrics.averageCardsLeftInHand / 6));
+      
+      // Combined performance (0-1 scale)
+      const overallPerformance = (defenseRate * 0.6 + efficiencyScore * 0.4);
+      
+      // Score delta: -200 to +200 based on how well AI is playing
+      const scoreDelta = Math.floor((overallPerformance - 0.5) * 400);
       
       setAhaScore(prev => {
-        const newScore = Math.max(1000, Math.min(15000, prev + scoreDelta));
+        const newScore = Math.max(1000, Math.min(20000, prev + scoreDelta));
         
-        // Evolve strategies
+        // Evolve strategies based on score thresholds
         if (newScore > 8000) {
           setStrategyWeights(prev => ({
             aggressive_factor: Math.min(2.0, prev.aggressive_factor + 0.05),
             trump_conservation: Math.min(1.5, prev.trump_conservation + 0.03),
             card_value_threshold: Math.max(10, prev.card_value_threshold - 0.5)
+          }));
+        }
+        
+        if (newScore > 12000) {
+          setStrategyWeights(prev => ({
+            aggressive_factor: Math.min(2.2, prev.aggressive_factor + 0.03),
+            trump_conservation: Math.min(1.7, prev.trump_conservation + 0.02),
+            card_value_threshold: Math.max(8, prev.card_value_threshold - 0.3)
           }));
         }
         
@@ -322,11 +366,13 @@ export default function Training() {
         aha_score: ahaScore,
         games_played: (currentData.games_played || 0) + gamesPlayed,
         games_won: (currentData.games_won || 0) + stats.ai1Wins + stats.ai2Wins,
+        successful_defenses: (currentData.successful_defenses || 0) + performanceMetrics.successfulDefenses,
+        total_moves: (currentData.total_moves || 0) + performanceMetrics.totalDefenses + performanceMetrics.totalAttacks,
         strategy_weights: strategyWeights,
         last_training_date: new Date().toISOString()
       });
     }
-  }, [gamesPlayed, stats, ahaScore, strategyWeights, trainingData, saveTrainingMutation]);
+  }, [gamesPlayed, stats, ahaScore, strategyWeights, trainingData, saveTrainingMutation, performanceMetrics]);
   
   const handleSaveProgress = () => {
     const currentData = trainingData.length > 0 ? trainingData[0] : {};
@@ -551,9 +597,10 @@ export default function Training() {
           <p className="text-purple-400">
             Current Strategy: Aggression {(strategyWeights.aggressive_factor * 100).toFixed(0)}% 
             | Trump Conservation {(strategyWeights.trump_conservation * 100).toFixed(0)}%
+            {performanceMetrics.totalDefenses > 0 && ` | Defense Rate ${((performanceMetrics.successfulDefenses / performanceMetrics.totalDefenses) * 100).toFixed(0)}%`}
           </p>
           <p className="text-xs text-slate-600">
-            💡 Let it train for 100+ games to reach world champion level (10,000+ AHA Score)
+            💡 Let it train for 100+ games to reach world champion level (10,000+ AHA Score). Score increases with better defense rates and efficient wins!
           </p>
         </div>
       </div>
