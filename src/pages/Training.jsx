@@ -402,6 +402,9 @@ export default function Training() {
     if (unvisMode) {
       // UNVIS MODE - ABSOLUTE MAXIMUM SPEED, PURE COMPUTATION
       let frameCounter = 0;
+      let localGamesCount = 0;
+      let localStats = { ai1Wins: 0, ai2Wins: 0, draws: 0 };
+      
       const runUnvis = () => {
         if (!isRunningRef.current) return;
         
@@ -413,18 +416,35 @@ export default function Training() {
           
           if (result) {
             if (result.gameOver) {
-              setGamesPlayed(prev => prev + 1);
-              setStats(prev => ({
-                ai1Wins: result.durak === 1 ? prev.ai1Wins + 1 : prev.ai1Wins,
-                ai2Wins: result.durak === 0 ? prev.ai2Wins + 1 : prev.ai2Wins,
-                draws: result.durak === null ? prev.draws + 1 : prev.draws
-              }));
+              localGamesCount++;
+              
+              // Track local stats
+              if (result.durak === 1) localStats.ai1Wins++;
+              else if (result.durak === 0) localStats.ai2Wins++;
+              else localStats.draws++;
               
               if (result.performanceData) {
                 setPerformanceMetrics(prev => ({
                   ...prev,
-                  averageCardsLeftInHand: (prev.averageCardsLeftInHand * (gamesPlayed) + result.performanceData.avgCardsLeft) / (gamesPlayed + 1)
+                  averageCardsLeftInHand: (prev.averageCardsLeftInHand * (gamesPlayed + localGamesCount - 1) + result.performanceData.avgCardsLeft) / (gamesPlayed + localGamesCount)
                 }));
+              }
+              
+              // Update UI every 100 games
+              if (localGamesCount % 100 === 0) {
+                setGamesPlayed(prev => prev + 100);
+                setStats(prev => ({
+                  ai1Wins: prev.ai1Wins + localStats.ai1Wins,
+                  ai2Wins: prev.ai2Wins + localStats.ai2Wins,
+                  draws: prev.draws + localStats.draws
+                }));
+                localStats = { ai1Wins: 0, ai2Wins: 0, draws: 0 };
+              }
+              
+              // Update UI every 10,000 games with current state
+              if (localGamesCount % 10000 === 0 && gameRef.current) {
+                setGameState({...gameRef.current});
+                setCurrentAction(`🔥 ${localGamesCount} games in this batch!`);
               }
               
               initGame();
@@ -432,9 +452,9 @@ export default function Training() {
           }
         }
         
-        // Update UI only every 10 frames
+        // Update visual state occasionally
         frameCounter++;
-        if (frameCounter % 10 === 0 && gameRef.current) {
+        if (frameCounter % 20 === 0 && gameRef.current) {
           setGameState({...gameRef.current});
         }
         
