@@ -728,14 +728,14 @@ export default function Training() {
           <div className="flex items-center gap-4 min-w-64">
             <FastForward className="w-4 h-4 text-slate-400" />
             <Slider
-              value={[2000 - speed]}
+              value={[1000 - speed]}
               min={0}
-              max={1990}
-              step={10}
-              onValueChange={([v]) => setSpeed(2000 - v)}
+              max={1000}
+              step={1}
+              onValueChange={([v]) => setSpeed(1000 - v)}
               className="flex-1"
             />
-            <span className="text-sm text-slate-400 min-w-16">{speed}ms</span>
+            <span className="text-sm text-slate-400 min-w-16">{speed === 0 ? 'MAX' : `${speed}ms`}</span>
           </div>
         </div>
         
