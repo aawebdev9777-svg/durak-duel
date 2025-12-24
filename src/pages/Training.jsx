@@ -123,8 +123,9 @@ export default function Training() {
   
   useEffect(() => {
     initGame();
-    // Auto-start training
+    // Auto-start training on max speed
     setIsRunning(true);
+    setSpeed(0);
   }, [initGame]);
   
   const endRound = useCallback((defenderTook = false) => {
