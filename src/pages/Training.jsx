@@ -844,9 +844,9 @@ export default function Training() {
           </div>
         )}
         
-        {/* Current Action or Analysis */}
-        <div className="text-center mb-6">
-          {isAnalyzing ? (
+        {/* Analysis Progress */}
+        {isAnalyzing && (
+          <div className="text-center mb-6">
             <motion.div
               className="inline-block px-6 py-3 bg-amber-500/20 rounded-lg border border-amber-500/50"
               initial={{ opacity: 0, scale: 0.9 }}
@@ -858,17 +858,8 @@ export default function Training() {
                 {analysisProgress}%
               </div>
             </motion.div>
-          ) : (
-            <motion.div
-              key={currentAction}
-              className="inline-block px-6 py-3 bg-purple-500/20 rounded-lg border border-purple-500/50 text-purple-300"
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-            >
-              {currentAction}
-            </motion.div>
-          )}
-        </div>
+          </div>
+        )}
         
         {/* Controls */}
         <div className="flex flex-col md:flex-row items-center justify-center gap-6">
