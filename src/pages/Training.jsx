@@ -183,7 +183,7 @@ export default function Training() {
     return { gameOver: false, state: newState };
   }, []);
   
-  const executeAITurn = useCallback(() => {
+  const executeAITurn = useCallback((skipStateUpdate = false) => {
     const state = gameRef.current;
     if (!state) return null;
     
@@ -221,7 +221,9 @@ export default function Training() {
             phase: 'defend'
           };
           gameRef.current = newState;
-          setCurrentAction(`AI ${aiPlayer + 1} attacks with ${attackCard.rank} of ${attackCard.suit}`);
+          if (!skipStateUpdate) {
+            setCurrentAction(`AI ${aiPlayer + 1} attacks with ${attackCard.rank} of ${attackCard.suit}`);
+          }
           return { state: newState };
         }
       } else {
@@ -247,12 +249,16 @@ export default function Training() {
               phase: 'defend'
             };
             gameRef.current = newState;
-            setCurrentAction(`AI ${aiPlayer + 1} adds ${attackCard.rank} of ${attackCard.suit}`);
+            if (!skipStateUpdate) {
+              setCurrentAction(`AI ${aiPlayer + 1} adds ${attackCard.rank} of ${attackCard.suit}`);
+            }
             return { state: newState };
           }
         }
-        
-        setCurrentAction(`AI ${aiPlayer + 1} ends attack`);
+
+        if (!skipStateUpdate) {
+          setCurrentAction(`AI ${aiPlayer + 1} ends attack`);
+        }
         return endRound(false);
       }
     } else {
@@ -308,7 +314,9 @@ export default function Training() {
             phase: allDefended ? 'attack' : 'defend'
           };
           gameRef.current = newState;
-          setCurrentAction(`AI ${aiPlayer + 1} defends with ${defenseCard.rank} of ${defenseCard.suit}`);
+          if (!skipStateUpdate) {
+            setCurrentAction(`AI ${aiPlayer + 1} defends with ${defenseCard.rank} of ${defenseCard.suit}`);
+          }
           return { state: newState };
         } else {
           // Track failed defense
@@ -332,8 +340,10 @@ export default function Training() {
               strategy_snapshot: strategyWeights
             }).catch(() => {});
           }
-          
-          setCurrentAction(`AI ${aiPlayer + 1} takes cards`);
+
+          if (!skipStateUpdate) {
+            setCurrentAction(`AI ${aiPlayer + 1} takes cards`);
+          }
           return endRound(true);
         }
       }
@@ -390,14 +400,44 @@ export default function Training() {
     };
     
     if (unvisMode) {
-      // UNVIS MODE - ABSOLUTE MAXIMUM SPEED, NO DELAYS, TIGHT LOOP
+      // UNVIS MODE - ABSOLUTE MAXIMUM SPEED, PURE COMPUTATION
+      let frameCounter = 0;
       const runUnvis = () => {
         if (!isRunningRef.current) return;
-        // Run multiple turns in single frame
-        for (let i = 0; i < 100; i++) {
+        
+        // Run THOUSANDS of turns per frame - pure computation, no UI updates
+        for (let i = 0; i < 10000; i++) {
           if (!isRunningRef.current) break;
-          runTurn();
+          
+          const result = executeAITurn(true); // Skip state updates
+          
+          if (result) {
+            if (result.gameOver) {
+              setGamesPlayed(prev => prev + 1);
+              setStats(prev => ({
+                ai1Wins: result.durak === 1 ? prev.ai1Wins + 1 : prev.ai1Wins,
+                ai2Wins: result.durak === 0 ? prev.ai2Wins + 1 : prev.ai2Wins,
+                draws: result.durak === null ? prev.draws + 1 : prev.draws
+              }));
+              
+              if (result.performanceData) {
+                setPerformanceMetrics(prev => ({
+                  ...prev,
+                  averageCardsLeftInHand: (prev.averageCardsLeftInHand * (gamesPlayed) + result.performanceData.avgCardsLeft) / (gamesPlayed + 1)
+                }));
+              }
+              
+              initGame();
+            }
+          }
         }
+        
+        // Update UI only every 10 frames
+        frameCounter++;
+        if (frameCounter % 10 === 0 && gameRef.current) {
+          setGameState({...gameRef.current});
+        }
+        
         if (isRunningRef.current) {
           requestAnimationFrame(runUnvis);
         }
@@ -422,7 +462,7 @@ export default function Training() {
         clearInterval(timerRef.current);
       }
     };
-  }, [isRunning, speed, executeAITurn, initGame, strategyWeights, gamesPlayed]);
+  }, [isRunning, speed, unvisMode, executeAITurn, initGame, strategyWeights, gamesPlayed]);
   
   // Update AHA score and save massive data every 100 games (no pause, continuous training)
   useEffect(() => {
