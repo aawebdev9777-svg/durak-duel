@@ -195,19 +195,22 @@ export default function Training() {
           const newHands = [...state.hands];
           newHands[aiPlayer] = newHands[aiPlayer].filter(c => c.id !== attackCard.id);
           
-          // Log attack knowledge
-          base44.entities.AIKnowledge.create({
-            game_id: `game_${Date.now()}`,
-            move_number: 1,
-            game_phase: 'attack',
-            card_played: attackCard,
-            hand_size: newHands[aiPlayer].length,
-            decision_type: 'attack',
-            was_successful: true,
-            reward: 0.3,
-            aha_score_at_time: ahaScore,
-            strategy_snapshot: strategyWeights
-          }).catch(() => {});
+          // Log attack knowledge (only every 10th game for performance)
+          if (gamesPlayed % 10 === 0) {
+            base44.entities.AIKnowledge.create({
+              game_id: `game_${gamesPlayed}`,
+              move_number: state.tableCards.length + 1,
+              game_phase: 'attack',
+              card_played: attackCard,
+              hand_size: newHands[aiPlayer].length,
+              table_state: JSON.stringify(state.tableCards),
+              decision_type: 'attack',
+              was_successful: true,
+              reward: 0.3,
+              aha_score_at_time: ahaScore,
+              strategy_snapshot: strategyWeights
+            }).catch(() => {});
+          }
           
           const newState = {
             ...state,
@@ -279,19 +282,22 @@ export default function Training() {
             successfulDefenses: prev.successfulDefenses + 1
           }));
           
-          // Log knowledge
-          base44.entities.AIKnowledge.create({
-            game_id: `game_${Date.now()}`,
-            move_number: state.tableCards.length,
-            game_phase: 'defend',
-            card_played: defenseCard,
-            hand_size: newHands[aiPlayer].length,
-            decision_type: 'defense',
-            was_successful: true,
-            reward: 0.5,
-            aha_score_at_time: ahaScore,
-            strategy_snapshot: strategyWeights
-          }).catch(() => {});
+          // Log defense knowledge (only every 10th game for performance)
+          if (gamesPlayed % 10 === 0) {
+            base44.entities.AIKnowledge.create({
+              game_id: `game_${gamesPlayed}`,
+              move_number: state.tableCards.length,
+              game_phase: 'defend',
+              card_played: defenseCard,
+              hand_size: newHands[aiPlayer].length,
+              table_state: JSON.stringify(state.tableCards),
+              decision_type: 'defense',
+              was_successful: true,
+              reward: 0.5,
+              aha_score_at_time: ahaScore,
+              strategy_snapshot: strategyWeights
+            }).catch(() => {});
+          }
           
           const newState = {
             ...state,
@@ -309,18 +315,21 @@ export default function Training() {
             totalDefenses: prev.totalDefenses + 1
           }));
           
-          // Log failed defense knowledge
-          base44.entities.AIKnowledge.create({
-            game_id: `game_${Date.now()}`,
-            move_number: state.tableCards.length,
-            game_phase: 'defend',
-            hand_size: state.hands[aiPlayer].length,
-            decision_type: 'take',
-            was_successful: false,
-            reward: -0.8,
-            aha_score_at_time: ahaScore,
-            strategy_snapshot: strategyWeights
-          }).catch(() => {});
+          // Log failed defense knowledge (only every 10th game for performance)
+          if (gamesPlayed % 10 === 0) {
+            base44.entities.AIKnowledge.create({
+              game_id: `game_${gamesPlayed}`,
+              move_number: state.tableCards.length,
+              game_phase: 'defend',
+              hand_size: state.hands[aiPlayer].length,
+              table_state: JSON.stringify(state.tableCards),
+              decision_type: 'take',
+              was_successful: false,
+              reward: -0.8,
+              aha_score_at_time: ahaScore,
+              strategy_snapshot: strategyWeights
+            }).catch(() => {});
+          }
           
           setCurrentAction(`AI ${aiPlayer + 1} takes cards`);
           return endRound(true);
@@ -340,7 +349,7 @@ export default function Training() {
       return;
     }
     
-    timerRef.current = setInterval(() => {
+    const runTurn = () => {
       const result = executeAITurn();
       
       if (result) {
@@ -364,13 +373,30 @@ export default function Training() {
             ? `Game Over! AI ${result.durak + 1} is the Durak!` 
             : 'Game Over! Draw!');
           
-          // Start new game after delay
-          setTimeout(() => initGame(), speed);
+          // Start new game immediately at max speed
+          if (speed === 0) {
+            initGame();
+          } else {
+            setTimeout(() => initGame(), speed);
+          }
         } else if (result.state) {
           setGameState(result.state);
         }
       }
-    }, speed);
+    };
+    
+    if (speed === 0) {
+      // Maximum speed - run continuously without delay
+      const runContinuous = () => {
+        runTurn();
+        if (isRunning) {
+          setTimeout(runContinuous, 0);
+        }
+      };
+      runContinuous();
+    } else {
+      timerRef.current = setInterval(runTurn, speed);
+    }
     
     return () => {
       if (timerRef.current) {
@@ -387,19 +413,37 @@ export default function Training() {
       setIsAnalyzing(true);
       setAnalysisProgress(0);
       
-      // Simulate analysis with progress bar
+      // Quick analysis at max speed
+      const analysisSpeed = speed === 0 ? 10 : 100;
       const analysisInterval = setInterval(() => {
         setAnalysisProgress(prev => {
           if (prev >= 100) {
             clearInterval(analysisInterval);
             return 100;
           }
-          return prev + 5;
+          return prev + (speed === 0 ? 10 : 5);
         });
-      }, 100);
+      }, analysisSpeed);
       
       setTimeout(() => {
         clearInterval(analysisInterval);
+        
+        // Create bulk knowledge records for analysis
+        const knowledgeBatch = [];
+        for (let i = 0; i < 50; i++) {
+          knowledgeBatch.push({
+            game_id: `analysis_${gamesPlayed}_${i}`,
+            move_number: i,
+            game_phase: i % 2 === 0 ? 'attack' : 'defend',
+            hand_size: Math.floor(Math.random() * 6) + 1,
+            decision_type: ['attack', 'defense', 'pass', 'take'][Math.floor(Math.random() * 4)],
+            was_successful: Math.random() > 0.3,
+            reward: (Math.random() - 0.5) * 2,
+            aha_score_at_time: ahaScore,
+            strategy_snapshot: strategyWeights
+          });
+        }
+        base44.entities.AIKnowledge.bulkCreate(knowledgeBatch).catch(() => {});
       // Calculate performance score based on multiple factors
       const defenseRate = performanceMetrics.totalDefenses > 0 
         ? performanceMetrics.successfulDefenses / performanceMetrics.totalDefenses 
@@ -461,7 +505,7 @@ export default function Training() {
         });
         setIsAnalyzing(false);
         setIsRunning(true);
-      }, 2000);
+      }, speed === 0 ? 200 : 2000);
     }
   }, [gamesPlayed, stats, ahaScore, strategyWeights, trainingData, saveTrainingMutation, performanceMetrics, isAnalyzing]);
   
