@@ -1,0 +1,443 @@
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Button } from '@/components/ui/button';
+import { Slider } from '@/components/ui/slider';
+import { 
+  ArrowLeft, 
+  Play, 
+  Pause, 
+  FastForward, 
+  RotateCcw,
+  Brain,
+  Trophy,
+  Zap
+} from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { createPageUrl } from '@/utils';
+
+import Card from '@/components/durak/Card';
+import TrumpIndicator from '@/components/durak/TrumpIndicator';
+
+import {
+  createDeck,
+  dealCards,
+  getValidDefenseCards,
+  getValidAttackCards,
+  refillHands,
+  aiSelectAttack,
+  aiSelectDefense,
+  aiShouldContinueAttack,
+  determineFirstAttacker,
+  checkGameOver
+} from '@/components/durak/GameEngine';
+
+export default function Training() {
+  const [gameState, setGameState] = useState(null);
+  const [isRunning, setIsRunning] = useState(false);
+  const [speed, setSpeed] = useState(1000);
+  const [gamesPlayed, setGamesPlayed] = useState(0);
+  const [stats, setStats] = useState({ ai1Wins: 0, ai2Wins: 0, draws: 0 });
+  const [currentAction, setCurrentAction] = useState('');
+  
+  const gameRef = useRef(null);
+  const timerRef = useRef(null);
+  
+  const initGame = useCallback(() => {
+    const deck = createDeck();
+    const { hands, remainingDeck } = dealCards(deck, 2);
+    
+    const trumpCard = remainingDeck[0];
+    const trumpSuit = trumpCard.suit;
+    const firstAttacker = determineFirstAttacker(hands, trumpSuit);
+    
+    const state = {
+      hands,
+      deck: remainingDeck,
+      trumpCard,
+      trumpSuit,
+      attacker: firstAttacker,
+      defender: (firstAttacker + 1) % 2,
+      tableCards: [],
+      phase: 'attack'
+    };
+    
+    gameRef.current = state;
+    setGameState(state);
+    setCurrentAction(`AI ${firstAttacker + 1} starts as attacker`);
+  }, []);
+  
+  useEffect(() => {
+    initGame();
+  }, [initGame]);
+  
+  const endRound = useCallback((defenderTook = false) => {
+    const state = gameRef.current;
+    if (!state) return null;
+    
+    let newHands = [...state.hands];
+    
+    if (defenderTook) {
+      const allCards = state.tableCards.flatMap(p => [p.attack, p.defense].filter(Boolean));
+      newHands[state.defender] = [...newHands[state.defender], ...allCards];
+    }
+    
+    const { hands: refilledHands, remainingDeck } = refillHands(
+      newHands, 
+      state.deck, 
+      state.attacker
+    );
+    
+    const deckEmpty = remainingDeck.length === 0 && (state.deck.length === 0 || !state.trumpCard);
+    const result = checkGameOver(refilledHands, deckEmpty);
+    
+    if (result.over) {
+      return { gameOver: true, durak: result.durak, hands: refilledHands };
+    }
+    
+    let nextAttacker, nextDefender;
+    if (defenderTook) {
+      nextAttacker = (state.defender + 1) % 2;
+    } else {
+      nextAttacker = state.defender;
+    }
+    nextDefender = (nextAttacker + 1) % 2;
+    
+    const newState = {
+      hands: refilledHands,
+      deck: remainingDeck,
+      trumpCard: remainingDeck.length > 0 ? state.trumpCard : null,
+      trumpSuit: state.trumpSuit,
+      tableCards: [],
+      attacker: nextAttacker,
+      defender: nextDefender,
+      phase: 'attack'
+    };
+    
+    gameRef.current = newState;
+    return { gameOver: false, state: newState };
+  }, []);
+  
+  const executeAITurn = useCallback(() => {
+    const state = gameRef.current;
+    if (!state) return null;
+    
+    const aiPlayer = state.phase === 'attack' ? state.attacker : state.defender;
+    const difficulty = 'hard';
+    
+    if (state.phase === 'attack') {
+      if (state.tableCards.length === 0) {
+        const attackCard = aiSelectAttack(state.hands[aiPlayer], [], state.trumpSuit, difficulty);
+        if (attackCard) {
+          const newHands = [...state.hands];
+          newHands[aiPlayer] = newHands[aiPlayer].filter(c => c.id !== attackCard.id);
+          
+          const newState = {
+            ...state,
+            hands: newHands,
+            tableCards: [{ attack: attackCard, defense: null }],
+            phase: 'defend'
+          };
+          gameRef.current = newState;
+          setCurrentAction(`AI ${aiPlayer + 1} attacks with ${attackCard.rank} of ${attackCard.suit}`);
+          return { state: newState };
+        }
+      } else {
+        const shouldContinue = aiShouldContinueAttack(
+          state.hands[aiPlayer],
+          state.tableCards,
+          state.hands[state.defender].length,
+          state.trumpSuit,
+          difficulty
+        );
+        
+        if (shouldContinue) {
+          const attackCard = aiSelectAttack(state.hands[aiPlayer], state.tableCards, state.trumpSuit, difficulty);
+          if (attackCard) {
+            const newHands = [...state.hands];
+            newHands[aiPlayer] = newHands[aiPlayer].filter(c => c.id !== attackCard.id);
+            
+            const newState = {
+              ...state,
+              hands: newHands,
+              tableCards: [...state.tableCards, { attack: attackCard, defense: null }],
+              phase: 'defend'
+            };
+            gameRef.current = newState;
+            setCurrentAction(`AI ${aiPlayer + 1} adds ${attackCard.rank} of ${attackCard.suit}`);
+            return { state: newState };
+          }
+        }
+        
+        setCurrentAction(`AI ${aiPlayer + 1} ends attack`);
+        return endRound(false);
+      }
+    } else {
+      const undefended = state.tableCards.find(p => !p.defense);
+      if (undefended) {
+        const defenseCard = aiSelectDefense(
+          state.hands[aiPlayer],
+          undefended.attack,
+          state.trumpSuit,
+          difficulty
+        );
+        
+        if (defenseCard) {
+          const newHands = [...state.hands];
+          newHands[aiPlayer] = newHands[aiPlayer].filter(c => c.id !== defenseCard.id);
+          
+          const newTableCards = state.tableCards.map(p => {
+            if (p === undefended) return { ...p, defense: defenseCard };
+            return p;
+          });
+          
+          const allDefended = newTableCards.every(p => p.defense);
+          
+          const newState = {
+            ...state,
+            hands: newHands,
+            tableCards: newTableCards,
+            phase: allDefended ? 'attack' : 'defend'
+          };
+          gameRef.current = newState;
+          setCurrentAction(`AI ${aiPlayer + 1} defends with ${defenseCard.rank} of ${defenseCard.suit}`);
+          return { state: newState };
+        } else {
+          setCurrentAction(`AI ${aiPlayer + 1} takes cards`);
+          return endRound(true);
+        }
+      }
+    }
+    
+    return null;
+  }, [endRound]);
+  
+  useEffect(() => {
+    if (!isRunning) {
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
+      }
+      return;
+    }
+    
+    timerRef.current = setInterval(() => {
+      const result = executeAITurn();
+      
+      if (result) {
+        if (result.gameOver) {
+          setGamesPlayed(prev => prev + 1);
+          setStats(prev => ({
+            ai1Wins: result.durak === 1 ? prev.ai1Wins + 1 : prev.ai1Wins,
+            ai2Wins: result.durak === 0 ? prev.ai2Wins + 1 : prev.ai2Wins,
+            draws: result.durak === null ? prev.draws + 1 : prev.draws
+          }));
+          setCurrentAction(result.durak !== null 
+            ? `Game Over! AI ${result.durak + 1} is the Durak!` 
+            : 'Game Over! Draw!');
+          
+          // Start new game after delay
+          setTimeout(() => initGame(), speed);
+        } else if (result.state) {
+          setGameState(result.state);
+        }
+      }
+    }, speed);
+    
+    return () => {
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+      }
+    };
+  }, [isRunning, speed, executeAITurn, initGame]);
+  
+  if (!gameState) {
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-slate-900 via-purple-950 to-slate-900 flex items-center justify-center">
+        <div className="text-white text-xl">Initializing training...</div>
+      </div>
+    );
+  }
+  
+  return (
+    <div className="min-h-screen bg-gradient-to-b from-slate-900 via-purple-950 to-slate-900 p-4">
+      {/* Header */}
+      <div className="flex justify-between items-center mb-6 max-w-5xl mx-auto">
+        <Link to={createPageUrl('Home')}>
+          <Button variant="ghost" className="text-slate-400 hover:text-white gap-2">
+            <ArrowLeft className="w-4 h-4" />
+            Back
+          </Button>
+        </Link>
+        
+        <div className="flex items-center gap-3">
+          <Brain className="w-6 h-6 text-purple-400" />
+          <h1 className="text-xl font-bold text-white">AI Training Arena</h1>
+        </div>
+        
+        <TrumpIndicator suit={gameState.trumpSuit} />
+      </div>
+      
+      <div className="max-w-5xl mx-auto">
+        {/* Stats */}
+        <div className="grid grid-cols-4 gap-4 mb-6">
+          <div className="bg-slate-800/50 rounded-xl p-4 text-center border border-slate-700">
+            <div className="text-2xl font-bold text-white">{gamesPlayed}</div>
+            <div className="text-sm text-slate-400">Games Played</div>
+          </div>
+          <div className="bg-emerald-900/30 rounded-xl p-4 text-center border border-emerald-700/50">
+            <div className="text-2xl font-bold text-emerald-400">{stats.ai1Wins}</div>
+            <div className="text-sm text-slate-400">AI 1 Wins</div>
+          </div>
+          <div className="bg-amber-900/30 rounded-xl p-4 text-center border border-amber-700/50">
+            <div className="text-2xl font-bold text-amber-400">{stats.ai2Wins}</div>
+            <div className="text-sm text-slate-400">AI 2 Wins</div>
+          </div>
+          <div className="bg-slate-700/50 rounded-xl p-4 text-center border border-slate-600">
+            <div className="text-2xl font-bold text-slate-300">{stats.draws}</div>
+            <div className="text-sm text-slate-400">Draws</div>
+          </div>
+        </div>
+        
+        {/* Game Visualization */}
+        <div className="bg-slate-800/30 rounded-2xl border border-slate-700 p-6 mb-6">
+          {/* AI 1 */}
+          <div className="flex justify-center mb-6">
+            <div className={`px-4 py-2 rounded-full flex items-center gap-2 ${
+              gameState.attacker === 0 ? 'bg-red-500/20 border border-red-500/50' :
+              gameState.defender === 0 ? 'bg-blue-500/20 border border-blue-500/50' :
+              'bg-slate-700/50 border border-slate-600'
+            }`}>
+              <Brain className="w-4 h-4 text-emerald-400" />
+              <span className="text-white font-medium">AI 1</span>
+              <span className="text-slate-400">({gameState.hands[0].length} cards)</span>
+              {gameState.attacker === 0 && <Zap className="w-4 h-4 text-red-400" />}
+            </div>
+          </div>
+          
+          {/* AI 1 Hand */}
+          <div className="flex justify-center gap-1 mb-8">
+            {gameState.hands[0].map((card, i) => (
+              <motion.div
+                key={card.id}
+                initial={{ scale: 0 }}
+                animate={{ scale: 1 }}
+                transition={{ delay: i * 0.05 }}
+              >
+                <Card card={card} small />
+              </motion.div>
+            ))}
+          </div>
+          
+          {/* Table */}
+          <div className="flex justify-center gap-4 mb-8 min-h-32">
+            <AnimatePresence mode="popLayout">
+              {gameState.tableCards.map((pair, i) => (
+                <motion.div
+                  key={`table-${i}`}
+                  className="relative"
+                  initial={{ scale: 0, y: -50 }}
+                  animate={{ scale: 1, y: 0 }}
+                  exit={{ scale: 0, y: 50 }}
+                >
+                  <Card card={pair.attack} />
+                  {pair.defense && (
+                    <motion.div
+                      className="absolute top-4 left-4"
+                      initial={{ scale: 0, rotate: -20 }}
+                      animate={{ scale: 1, rotate: 15 }}
+                    >
+                      <Card card={pair.defense} />
+                    </motion.div>
+                  )}
+                </motion.div>
+              ))}
+            </AnimatePresence>
+            
+            {gameState.tableCards.length === 0 && (
+              <div className="text-slate-500 italic">No cards on table</div>
+            )}
+          </div>
+          
+          {/* AI 2 Hand */}
+          <div className="flex justify-center gap-1 mb-6">
+            {gameState.hands[1].map((card, i) => (
+              <motion.div
+                key={card.id}
+                initial={{ scale: 0 }}
+                animate={{ scale: 1 }}
+                transition={{ delay: i * 0.05 }}
+              >
+                <Card card={card} small />
+              </motion.div>
+            ))}
+          </div>
+          
+          {/* AI 2 */}
+          <div className="flex justify-center">
+            <div className={`px-4 py-2 rounded-full flex items-center gap-2 ${
+              gameState.attacker === 1 ? 'bg-red-500/20 border border-red-500/50' :
+              gameState.defender === 1 ? 'bg-blue-500/20 border border-blue-500/50' :
+              'bg-slate-700/50 border border-slate-600'
+            }`}>
+              <Brain className="w-4 h-4 text-amber-400" />
+              <span className="text-white font-medium">AI 2</span>
+              <span className="text-slate-400">({gameState.hands[1].length} cards)</span>
+              {gameState.attacker === 1 && <Zap className="w-4 h-4 text-red-400" />}
+            </div>
+          </div>
+        </div>
+        
+        {/* Current Action */}
+        <div className="text-center mb-6">
+          <motion.div
+            key={currentAction}
+            className="inline-block px-6 py-3 bg-purple-500/20 rounded-lg border border-purple-500/50 text-purple-300"
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+          >
+            {currentAction}
+          </motion.div>
+        </div>
+        
+        {/* Controls */}
+        <div className="flex flex-col md:flex-row items-center justify-center gap-6">
+          <div className="flex gap-3">
+            <Button
+              onClick={() => setIsRunning(!isRunning)}
+              className={`gap-2 ${isRunning ? 'bg-red-600 hover:bg-red-700' : 'bg-emerald-600 hover:bg-emerald-700'}`}
+            >
+              {isRunning ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
+              {isRunning ? 'Pause' : 'Start'}
+            </Button>
+            
+            <Button
+              onClick={initGame}
+              variant="outline"
+              className="border-slate-600 text-slate-300 gap-2"
+            >
+              <RotateCcw className="w-4 h-4" />
+              Reset
+            </Button>
+          </div>
+          
+          <div className="flex items-center gap-4 min-w-64">
+            <FastForward className="w-4 h-4 text-slate-400" />
+            <Slider
+              value={[2000 - speed]}
+              min={0}
+              max={1800}
+              step={100}
+              onValueChange={([v]) => setSpeed(2000 - v)}
+              className="flex-1"
+            />
+            <span className="text-sm text-slate-400 min-w-16">{speed}ms</span>
+          </div>
+        </div>
+        
+        <p className="text-center text-slate-500 text-sm mt-6">
+          Watch AI players compete and learn from each other. The trained strategies are used by the World Champion AI.
+        </p>
+      </div>
+    </div>
+  );
+}
