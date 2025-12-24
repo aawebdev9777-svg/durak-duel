@@ -8,13 +8,9 @@ import {
   ArrowLeft, 
   Play, 
   Pause, 
-  FastForward, 
-  RotateCcw,
   Brain,
-  Trophy,
   Zap,
-  TrendingUp,
-  Save
+  Database
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
@@ -38,8 +34,7 @@ import {
 export default function Training() {
   const [gameState, setGameState] = useState(null);
   const [isRunning, setIsRunning] = useState(false);
-  const [speed, setSpeed] = useState(1000);
-  const [unvisMode, setUnvisMode] = useState(false);
+  const [speed, setSpeed] = useState(0);
   const [gamesPlayed, setGamesPlayed] = useState(0);
   const [stats, setStats] = useState({ ai1Wins: 0, ai2Wins: 0, draws: 0 });
   const [currentAction, setCurrentAction] = useState('');
@@ -394,82 +389,54 @@ export default function Training() {
       }
     };
     
-    if (unvisMode) {
-      // UNVIS MODE - ABSOLUTE MAXIMUM SPEED, PURE COMPUTATION
-      let frameCounter = 0;
+    if (speed === 0) {
+      // MAX SPEED MODE - ULTRA FAST COMPUTATION
       let localGamesCount = 0;
       let localStats = { ai1Wins: 0, ai2Wins: 0, draws: 0 };
       
-      const runUnvis = () => {
+      const runMaxSpeed = () => {
         if (!isRunningRef.current) return;
         
-        // Run THOUSANDS of turns per frame - pure computation, no UI updates
-        for (let i = 0; i < 10000; i++) {
+        // Run 100,000 turns per frame - maximum speed
+        for (let i = 0; i < 100000; i++) {
           if (!isRunningRef.current) break;
           
-          const result = executeAITurn(true); // Skip state updates
+          const result = executeAITurn(true);
           
-          if (result) {
-            if (result.gameOver) {
-              localGamesCount++;
-              
-              // Track local stats
-              if (result.durak === 1) localStats.ai1Wins++;
-              else if (result.durak === 0) localStats.ai2Wins++;
-              else localStats.draws++;
-              
-              if (result.performanceData) {
-                setPerformanceMetrics(prev => ({
-                  ...prev,
-                  averageCardsLeftInHand: (prev.averageCardsLeftInHand * (gamesPlayed + localGamesCount - 1) + result.performanceData.avgCardsLeft) / (gamesPlayed + localGamesCount)
-                }));
-              }
-              
-              // Update UI every 100 games
-              if (localGamesCount % 100 === 0) {
-                setGamesPlayed(prev => prev + 100);
-                setStats(prev => ({
-                  ai1Wins: prev.ai1Wins + localStats.ai1Wins,
-                  ai2Wins: prev.ai2Wins + localStats.ai2Wins,
-                  draws: prev.draws + localStats.draws
-                }));
-                localStats = { ai1Wins: 0, ai2Wins: 0, draws: 0 };
-              }
-              
-              // Update UI every 10,000 games with current state
-              if (localGamesCount % 10000 === 0 && gameRef.current) {
-                setGameState({...gameRef.current});
-                setCurrentAction(`🔥 ${localGamesCount} games in this batch!`);
-              }
-              
-              initGame();
+          if (result && result.gameOver) {
+            localGamesCount++;
+            
+            if (result.durak === 1) localStats.ai1Wins++;
+            else if (result.durak === 0) localStats.ai2Wins++;
+            else localStats.draws++;
+            
+            if (result.performanceData) {
+              setPerformanceMetrics(prev => ({
+                ...prev,
+                averageCardsLeftInHand: (prev.averageCardsLeftInHand * (gamesPlayed + localGamesCount - 1) + result.performanceData.avgCardsLeft) / (gamesPlayed + localGamesCount)
+              }));
             }
+            
+            // Sync every 100 games
+            if (localGamesCount % 100 === 0) {
+              setGamesPlayed(prev => prev + 100);
+              setStats(prev => ({
+                ai1Wins: prev.ai1Wins + localStats.ai1Wins,
+                ai2Wins: prev.ai2Wins + localStats.ai2Wins,
+                draws: prev.draws + localStats.draws
+              }));
+              localStats = { ai1Wins: 0, ai2Wins: 0, draws: 0 };
+            }
+            
+            initGame();
           }
         }
         
-        // Update visual state occasionally
-        frameCounter++;
-        if (frameCounter % 20 === 0 && gameRef.current) {
-          setGameState({...gameRef.current});
-        }
-        
         if (isRunningRef.current) {
-          requestAnimationFrame(runUnvis);
+          requestAnimationFrame(runMaxSpeed);
         }
       };
-      requestAnimationFrame(runUnvis);
-    } else if (speed === 0) {
-      // Maximum speed - run continuously without delay
-      const runContinuous = () => {
-        if (!isRunningRef.current) return;
-        runTurn();
-        if (isRunningRef.current) {
-          setTimeout(runContinuous, 0);
-        }
-      };
-      runContinuous();
-    } else {
-      timerRef.current = setInterval(runTurn, speed);
+      requestAnimationFrame(runMaxSpeed);
     }
     
     return () => {
@@ -682,162 +649,21 @@ export default function Training() {
       </div>
       
       <div className="max-w-5xl mx-auto">
-        {/* Stats */}
-        <div className="grid grid-cols-6 gap-3 mb-6">
-          <div className="bg-purple-900/40 rounded-xl p-4 text-center border border-purple-700/50 relative overflow-hidden">
-            <div className="absolute top-0 right-0 w-16 h-16 bg-purple-500/20 rounded-full blur-2xl" />
-            <div className="relative flex items-center justify-center gap-2 mb-1">
-              <TrendingUp className="w-4 h-4 text-purple-400" />
-              <div className="text-2xl font-bold text-purple-400">{ahaScore}</div>
+        {/* Total Games - Large Display */}
+        <div className="text-center mb-8">
+          <motion.div
+            className="inline-block"
+            animate={{ scale: [1, 1.05, 1] }}
+            transition={{ duration: 2, repeat: Infinity }}
+          >
+            <div className="text-9xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-purple-400 via-pink-400 to-blue-400">
+              {((trainingData[0]?.games_played || 0) + gamesPlayed).toLocaleString()}
             </div>
-            <div className="text-xs text-slate-400">
-              {language === 'ru' ? 'Рейтинг АХА' : 'AHA Score'}
+            <div className="text-xl text-slate-400 mt-4">
+              {language === 'ru' ? 'ВСЕГО ИГР' : 'TOTAL GAMES'}
             </div>
-            {ahaScore >= 10000 && (
-              <div className="text-xs text-amber-400 mt-1">
-                🏆 {language === 'ru' ? 'Чемпион!' : 'Champion!'}
-              </div>
-            )}
-          </div>
-          <div className="bg-slate-800/50 rounded-xl p-4 text-center border border-slate-700">
-            <div className="text-2xl font-bold text-white">{gamesPlayed}/100</div>
-            <div className="text-xs text-slate-400">
-              {language === 'ru' ? 'Игры' : 'Games'}
-            </div>
-          </div>
-          <div className="bg-emerald-900/30 rounded-xl p-4 text-center border border-emerald-700/50">
-            <div className="text-2xl font-bold text-emerald-400">{stats.ai1Wins}</div>
-            <div className="text-xs text-slate-400">
-              {language === 'ru' ? 'Победы ИИ 1' : 'AI 1 Wins'}
-            </div>
-          </div>
-          <div className="bg-amber-900/30 rounded-xl p-4 text-center border border-amber-700/50">
-            <div className="text-2xl font-bold text-amber-400">{stats.ai2Wins}</div>
-            <div className="text-xs text-slate-400">
-              {language === 'ru' ? 'Победы ИИ 2' : 'AI 2 Wins'}
-            </div>
-          </div>
-          <div className="bg-slate-700/50 rounded-xl p-4 text-center border border-slate-600">
-            <div className="text-2xl font-bold text-slate-300">{stats.draws}</div>
-            <div className="text-xs text-slate-400">
-              {language === 'ru' ? 'Ничья' : 'Draws'}
-            </div>
-          </div>
-          <div className="bg-blue-900/30 rounded-xl p-4 text-center border border-blue-700/50">
-            <div className="text-2xl font-bold text-blue-400">
-              {((trainingData[0]?.games_played || 0) + gamesPlayed)}
-            </div>
-            <div className="text-xs text-slate-400">
-              {language === 'ru' ? 'Всего игр' : 'Total Games'}
-            </div>
-          </div>
+          </motion.div>
         </div>
-        
-        {/* Game Visualization */}
-        {!unvisMode && speed > 0 && (
-        <div className="bg-slate-800/30 rounded-2xl border border-slate-700 p-6 mb-6">
-          {/* AI 1 */}
-          <div className="flex justify-center mb-6">
-            <div className={`px-4 py-2 rounded-full flex items-center gap-2 ${
-              gameState.attacker === 0 ? 'bg-red-500/20 border border-red-500/50' :
-              gameState.defender === 0 ? 'bg-blue-500/20 border border-blue-500/50' :
-              'bg-slate-700/50 border border-slate-600'
-            }`}>
-              <Brain className="w-4 h-4 text-emerald-400" />
-              <span className="text-white font-medium">AI 1</span>
-              <span className="text-slate-400">({gameState.hands[0].length} cards)</span>
-              {gameState.attacker === 0 && <Zap className="w-4 h-4 text-red-400" />}
-            </div>
-          </div>
-          
-          {/* AI 1 Hand */}
-          <div className="flex justify-center gap-1 mb-8">
-            {gameState.hands[0].map((card, i) => (
-              <motion.div
-                key={card.id}
-                initial={{ scale: 0 }}
-                animate={{ scale: 1 }}
-                transition={{ delay: i * 0.05 }}
-              >
-                <Card card={card} small />
-              </motion.div>
-            ))}
-          </div>
-          
-          {/* Table */}
-          <div className="flex justify-center gap-4 mb-8 min-h-32">
-            <AnimatePresence mode="popLayout">
-              {gameState.tableCards.map((pair, i) => (
-                <motion.div
-                  key={`table-${i}`}
-                  className="relative"
-                  initial={{ scale: 0, y: -50 }}
-                  animate={{ scale: 1, y: 0 }}
-                  exit={{ scale: 0, y: 50 }}
-                >
-                  <Card card={pair.attack} />
-                  {pair.defense && (
-                    <motion.div
-                      className="absolute top-4 left-4"
-                      initial={{ scale: 0, rotate: -20 }}
-                      animate={{ scale: 1, rotate: 15 }}
-                    >
-                      <Card card={pair.defense} />
-                    </motion.div>
-                  )}
-                </motion.div>
-              ))}
-            </AnimatePresence>
-            
-            {gameState.tableCards.length === 0 && (
-              <div className="text-slate-500 italic">No cards on table</div>
-            )}
-          </div>
-          
-          {/* AI 2 Hand */}
-          <div className="flex justify-center gap-1 mb-6">
-            {gameState.hands[1].map((card, i) => (
-              <motion.div
-                key={card.id}
-                initial={{ scale: 0 }}
-                animate={{ scale: 1 }}
-                transition={{ delay: i * 0.05 }}
-              >
-                <Card card={card} small />
-              </motion.div>
-            ))}
-          </div>
-          
-          {/* AI 2 */}
-          <div className="flex justify-center">
-            <div className={`px-4 py-2 rounded-full flex items-center gap-2 ${
-              gameState.attacker === 1 ? 'bg-red-500/20 border border-red-500/50' :
-              gameState.defender === 1 ? 'bg-blue-500/20 border border-blue-500/50' :
-              'bg-slate-700/50 border border-slate-600'
-            }`}>
-              <Brain className="w-4 h-4 text-amber-400" />
-              <span className="text-white font-medium">AI 2</span>
-              <span className="text-slate-400">({gameState.hands[1].length} cards)</span>
-              {gameState.attacker === 1 && <Zap className="w-4 h-4 text-red-400" />}
-            </div>
-          </div>
-        </div>
-        )}
-        
-        {/* UNVIS MODE Indicator */}
-        {unvisMode && !isAnalyzing && (
-          <div className="text-center mb-6">
-            <div className="inline-block px-8 py-6 bg-gradient-to-r from-purple-900/40 to-red-900/40 rounded-xl border-2 border-purple-500/50 animate-pulse">
-              <div className="text-purple-300 font-bold text-2xl flex items-center gap-3 mb-2">
-                <Zap className="w-8 h-8 animate-spin" />
-                ⚡ UNVIS MODE ⚡
-              </div>
-              <div className="text-slate-300 text-sm">
-                {language === 'ru' ? 'МАКСИМАЛЬНАЯ СКОРОСТЬ | БЕЗ ВИЗУАЛИЗАЦИИ' : 'MAXIMUM SPEED | NO VISUALIZATION'}
-              </div>
-            </div>
-          </div>
-        )}
         
         {/* Analysis Progress */}
         {isAnalyzing && (
@@ -857,76 +683,36 @@ export default function Training() {
         )}
         
         {/* Controls */}
-        <div className="flex flex-col md:flex-row items-center justify-center gap-6">
-          <div className="flex gap-3">
-              <Button
-                onClick={() => {
-                  if (isRunning) {
-                    handleSaveProgress();
-                  } else {
-                    setIsRunning(true);
-                  }
-                }}
-                className={`gap-2 ${isRunning ? 'bg-red-600 hover:bg-red-700' : 'bg-emerald-600 hover:bg-emerald-700'}`}
-                disabled={isAnalyzing}
-              >
-                {isRunning ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
-                {isRunning 
-                  ? (language === 'ru' ? 'Остановить и сохранить' : 'Stop & Save')
-                  : (language === 'ru' ? 'Начать обучение' : 'Start Training')}
-              </Button>
-
-              <Button
-                onClick={() => setUnvisMode(!unvisMode)}
-                className={`gap-2 ${unvisMode ? 'bg-purple-600 hover:bg-purple-700 animate-pulse' : 'bg-slate-700 hover:bg-slate-600'}`}
-              >
-                <Zap className="w-4 h-4" />
-                {unvisMode ? 'UNVIS ON' : 'UNVIS'}
-              </Button>
-            
-            <Button
-              onClick={initGame}
-              variant="outline"
-              className="border-slate-600 text-slate-300 gap-2"
-            >
-              <RotateCcw className="w-4 h-4" />
-              {language === 'ru' ? 'Сбросить' : 'Reset'}
-            </Button>
-          </div>
+        <div className="flex items-center justify-center gap-3">
+          <Button
+            onClick={() => {
+              if (isRunning) {
+                handleSaveProgress();
+              } else {
+                setIsRunning(true);
+              }
+            }}
+            className={`gap-2 ${isRunning ? 'bg-red-600 hover:bg-red-700' : 'bg-emerald-600 hover:bg-emerald-700'}`}
+            disabled={isAnalyzing}
+          >
+            {isRunning ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
+            {isRunning 
+              ? (language === 'ru' ? 'Остановить' : 'Stop')
+              : (language === 'ru' ? 'Старт' : 'Start')}
+          </Button>
           
-          <div className="flex items-center gap-4 min-w-64">
-            <FastForward className="w-4 h-4 text-slate-400" />
-            <Slider
-              value={[1000 - speed]}
-              min={0}
-              max={1000}
-              step={1}
-              onValueChange={([v]) => setSpeed(1000 - v)}
-              className="flex-1"
-              disabled={unvisMode}
-            />
-            <span className="text-sm text-slate-400 min-w-16">
-              {unvisMode ? 'UNVIS' : speed === 0 ? 'MAX' : `${speed}ms`}
-            </span>
-          </div>
+          <Link to={createPageUrl('KnowledgeBase')}>
+            <Button variant="outline" className="border-purple-500/50 text-purple-400 hover:bg-purple-500/20 gap-2">
+              <Database className="w-4 h-4" />
+              {language === 'ru' ? 'База знаний' : 'Knowledge Base'}
+            </Button>
+          </Link>
         </div>
         
-        <div className="text-center text-slate-500 text-sm mt-6 space-y-2">
-          <p>
-            {language === 'ru' 
-              ? 'Смотрите, как ИИ соревнуются и учатся друг у друга. ИИ АХА учится на каждой игре!'
-              : 'Watch AI players compete and learn from each other. The AHA AI learns from every game!'}
-          </p>
-          <p className="text-purple-400">
-            {language === 'ru' ? 'Текущая стратегия' : 'Current Strategy'}: {language === 'ru' ? 'Агрессия' : 'Aggression'} {(strategyWeights.aggressive_factor * 100).toFixed(0)}% 
-            | {language === 'ru' ? 'Сохранение козырей' : 'Trump Conservation'} {(strategyWeights.trump_conservation * 100).toFixed(0)}%
-            {performanceMetrics.totalDefenses > 0 && ` | ${language === 'ru' ? 'Успешная защита' : 'Defense Rate'} ${((performanceMetrics.successfulDefenses / performanceMetrics.totalDefenses) * 100).toFixed(0)}%`}
-          </p>
-          <p className="text-xs text-slate-600">
-            💡 {language === 'ru' 
-              ? 'Система автоматически обрабатывает данные каждые 100 игр. АХА начинается с 0 и медленно растёт с тысячами игр. 10,000+ = мирового уровня!'
-              : 'System analyzes every 100 games. AHA starts at 0 and grows slowly over thousands of games. 10,000+ = World Champion!'}
-          </p>
+        <div className="text-center text-slate-500 text-xs mt-6">
+          💡 {language === 'ru' 
+            ? 'Авто-синхронизация каждые 100 игр. Работает даже в спящем режиме.'
+            : 'Auto-syncs every 100 games. Works even when computer sleeps.'}
         </div>
       </div>
     </div>
