@@ -211,23 +211,23 @@ export default function KnowledgeBase() {
           </CardHeader>
           <CardContent>
             <div className="grid md:grid-cols-4 gap-4">
-              <div className="bg-slate-700/30 rounded-lg p-4 text-center">
-                <div className="text-2xl font-bold text-red-400 mb-1">{stats.attackMoves}</div>
-                <div className="text-xs text-slate-400">Attack Moves</div>
+              <div className="bg-slate-700/30 rounded-lg p-6 text-center">
+                <div className="text-6xl font-bold text-red-400 mb-2">{stats.attackMoves}</div>
+                <div className="text-sm text-slate-400">Attack Moves</div>
               </div>
-              <div className="bg-slate-700/30 rounded-lg p-4 text-center">
-                <div className="text-2xl font-bold text-blue-400 mb-1">{stats.defenseMoves}</div>
-                <div className="text-xs text-slate-400">Defense Moves</div>
+              <div className="bg-slate-700/30 rounded-lg p-6 text-center">
+                <div className="text-6xl font-bold text-blue-400 mb-2">{stats.defenseMoves}</div>
+                <div className="text-sm text-slate-400">Defense Moves</div>
               </div>
-              <div className="bg-slate-700/30 rounded-lg p-4 text-center">
-                <div className="text-2xl font-bold text-emerald-400 mb-1">{stats.successfulMoves}</div>
-                <div className="text-xs text-slate-400">Successful</div>
+              <div className="bg-slate-700/30 rounded-lg p-6 text-center">
+                <div className="text-6xl font-bold text-emerald-400 mb-2">{stats.successfulMoves}</div>
+                <div className="text-sm text-slate-400">Successful</div>
               </div>
-              <div className="bg-slate-700/30 rounded-lg p-4 text-center">
-                <div className="text-2xl font-bold text-slate-400 mb-1">
+              <div className="bg-slate-700/30 rounded-lg p-6 text-center">
+                <div className="text-6xl font-bold text-slate-400 mb-2">
                   {stats.totalMoves - stats.successfulMoves}
                 </div>
-                <div className="text-xs text-slate-400">Failed</div>
+                <div className="text-sm text-slate-400">Failed</div>
               </div>
             </div>
           </CardContent>
