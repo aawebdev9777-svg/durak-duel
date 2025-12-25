@@ -1,14 +1,14 @@
 import Game from './pages/Game';
 import Home from './pages/Home';
-import KnowledgeBase from './pages/KnowledgeBase';
 import Training from './pages/Training';
+import KnowledgeBase from './pages/KnowledgeBase';
 
 
 export const PAGES = {
     "Game": Game,
     "Home": Home,
-    "KnowledgeBase": KnowledgeBase,
     "Training": Training,
+    "KnowledgeBase": KnowledgeBase,
 }
 
 export const pagesConfig = {

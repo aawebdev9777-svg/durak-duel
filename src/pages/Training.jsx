@@ -59,7 +59,6 @@ export default function Training() {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analysisProgress, setAnalysisProgress] = useState(0);
   const [language, setLanguage] = useState('en');
-  const [maxSpeedMode, setMaxSpeedMode] = useState(false);
   
   const gameRef = useRef(null);
   const timerRef = useRef(null);
@@ -359,18 +358,17 @@ export default function Training() {
     }
     
     const runTurn = () => {
-      const result = executeAITurn(speed === 0); // Skip updates in MAX mode
-
+      const result = executeAITurn();
+      
       if (result) {
         if (result.gameOver) {
-          const newGamesPlayed = gamesPlayed + 1;
-          setGamesPlayed(newGamesPlayed);
+          setGamesPlayed(prev => prev + 1);
           setStats(prev => ({
             ai1Wins: result.durak === 1 ? prev.ai1Wins + 1 : prev.ai1Wins,
             ai2Wins: result.durak === 0 ? prev.ai2Wins + 1 : prev.ai2Wins,
             draws: result.durak === null ? prev.draws + 1 : prev.draws
           }));
-
+          
           // Track game performance
           if (result.performanceData) {
             setPerformanceMetrics(prev => ({
@@ -378,116 +376,23 @@ export default function Training() {
               averageCardsLeftInHand: (prev.averageCardsLeftInHand * (gamesPlayed) + result.performanceData.avgCardsLeft) / (gamesPlayed + 1)
             }));
           }
-
-          if (speed !== 0) {
-            setCurrentAction(result.durak !== null 
-              ? `Game Over! AI ${result.durak + 1} is the Durak!` 
-              : 'Game Over! Draw!');
-          }
-
-          // Auto-sync every 100 games in MAX mode
-          if (speed === 0 && newGamesPlayed >= 100) {
-            setIsRunning(false);
-            setIsAnalyzing(true);
-            setAnalysisProgress(0);
-
-            const analysisInterval = setInterval(() => {
-              setAnalysisProgress(prev => Math.min(100, prev + 20));
-            }, 50);
-
-            setTimeout(() => {
-              clearInterval(analysisInterval);
-
-              const knowledgeBatch = [];
-              const recordCount = 200;
-
-              for (let i = 0; i < recordCount; i++) {
-                const phase = ['attack', 'defend'][Math.floor(Math.random() * 2)];
-                const decision = ['attack', 'defense', 'pass', 'take'][Math.floor(Math.random() * 4)];
-                const wasSuccessful = Math.random() > 0.35;
-
-                knowledgeBatch.push({
-                  game_id: `session_${Date.now()}_game_${i}`,
-                  move_number: Math.floor(Math.random() * 20) + 1,
-                  game_phase: phase,
-                  card_played: Math.random() > 0.3 ? {
-                    rank: Math.floor(Math.random() * 9) + 6,
-                    suit: ['hearts', 'diamonds', 'clubs', 'spades'][Math.floor(Math.random() * 4)]
-                  } : null,
-                  hand_size: Math.floor(Math.random() * 6) + 1,
-                  table_state: JSON.stringify({
-                    cards_on_table: Math.floor(Math.random() * 6),
-                    defended_pairs: Math.floor(Math.random() * 3),
-                    trump_played: Math.random() > 0.7
-                  }),
-                  decision_type: decision,
-                  was_successful: wasSuccessful,
-                  reward: Number((wasSuccessful ? Math.random() * 0.8 + 0.2 : -Math.random() * 0.8).toFixed(2)),
-                  aha_score_at_time: ahaScore,
-                  strategy_snapshot: strategyWeights
-                });
-              }
-              base44.entities.AIKnowledge.bulkCreate(knowledgeBatch).catch(() => {});
-
-              const defenseRate = performanceMetrics.totalDefenses > 0 
-                ? performanceMetrics.successfulDefenses / performanceMetrics.totalDefenses 
-                : 0.5;
-              const efficiencyScore = Math.max(0, 1 - (performanceMetrics.averageCardsLeftInHand / 6));
-              const overallPerformance = (defenseRate * 0.6 + efficiencyScore * 0.4);
-              const scoreDelta = Math.floor(overallPerformance * 5);
-
-              setAhaScore(prev => {
-                const newScore = Math.max(0, Math.min(20000, prev + scoreDelta));
-
-                if (newScore > 8000) {
-                  setStrategyWeights(prev => ({
-                    aggressive_factor: Math.min(2.0, prev.aggressive_factor + 0.05),
-                    trump_conservation: Math.min(1.5, prev.trump_conservation + 0.03),
-                    card_value_threshold: Math.max(10, prev.card_value_threshold - 0.5)
-                  }));
-                }
-
-                return newScore;
-              });
-
-              const currentData = trainingData.length > 0 ? trainingData[0] : {};
-              saveTrainingMutation.mutate({
-                aha_score: ahaScore,
-                games_played: (currentData.games_played || 0) + newGamesPlayed,
-                games_won: (currentData.games_won || 0) + stats.ai1Wins + stats.ai2Wins,
-                successful_defenses: (currentData.successful_defenses || 0) + performanceMetrics.successfulDefenses,
-                total_moves: (currentData.total_moves || 0) + performanceMetrics.totalDefenses + performanceMetrics.totalAttacks,
-                strategy_weights: strategyWeights,
-                last_training_date: new Date().toISOString()
-              });
-
-              setGamesPlayed(0);
-              setStats({ ai1Wins: 0, ai2Wins: 0, draws: 0 });
-              setPerformanceMetrics({
-                totalDefenses: 0,
-                successfulDefenses: 0,
-                totalAttacks: 0,
-                successfulAttacks: 0,
-                averageCardsLeftInHand: 0
-              });
-              setIsAnalyzing(false);
-              setIsRunning(true);
-            }, 250);
-            return;
-          }
-
-          // Start new game
+          
+          setCurrentAction(result.durak !== null 
+            ? `Game Over! AI ${result.durak + 1} is the Durak!` 
+            : 'Game Over! Draw!');
+          
+          // Start new game immediately at max speed
           if (speed === 0) {
             initGame();
           } else {
             setTimeout(() => initGame(), speed);
           }
-        } else if (result.state && speed !== 0) {
+        } else if (result.state) {
           setGameState(result.state);
         }
       }
     };
-
+    
     if (unvisMode) {
       // UNVIS MODE - ABSOLUTE MAXIMUM SPEED, PURE COMPUTATION
       let frameCounter = 0;
@@ -553,32 +458,15 @@ export default function Training() {
       };
       requestAnimationFrame(runUnvis);
     } else if (speed === 0) {
-      // MAX SPEED - Ultra-fast batch processing
-      setMaxSpeedMode(true);
-      let batchCount = 0;
-      const runMaxSpeed = () => {
-        if (!isRunningRef.current) {
-          setMaxSpeedMode(false);
-          return;
-        }
-
-        // Run 100 turns per batch for maximum speed
-        for (let i = 0; i < 100; i++) {
-          if (!isRunningRef.current) break;
-          runTurn();
-        }
-
-        batchCount++;
-        // Update UI every 10 batches
-        if (batchCount % 10 === 0 && gameRef.current) {
-          setGameState({...gameRef.current});
-        }
-
+      // Maximum speed - run continuously without delay
+      const runContinuous = () => {
+        if (!isRunningRef.current) return;
+        runTurn();
         if (isRunningRef.current) {
-          setTimeout(runMaxSpeed, 0);
+          setTimeout(runContinuous, 0);
         }
       };
-      runMaxSpeed();
+      runContinuous();
     } else {
       timerRef.current = setInterval(runTurn, speed);
     }
@@ -845,7 +733,7 @@ export default function Training() {
         </div>
         
         {/* Game Visualization */}
-        {!unvisMode && !maxSpeedMode && speed > 0 && (
+        {!unvisMode && speed > 0 && (
         <div className="bg-slate-800/30 rounded-2xl border border-slate-700 p-6 mb-6">
           {/* AI 1 */}
           <div className="flex justify-center mb-6">
@@ -935,24 +823,6 @@ export default function Training() {
         </div>
         )}
         
-        {/* MAX SPEED Indicator */}
-        {maxSpeedMode && !isAnalyzing && (
-          <div className="text-center mb-6">
-            <div className="inline-block px-8 py-6 bg-gradient-to-r from-emerald-900/40 to-green-900/40 rounded-xl border-2 border-emerald-500/50 animate-pulse">
-              <div className="text-emerald-300 font-bold text-3xl flex items-center gap-3 mb-2">
-                <Zap className="w-10 h-10 animate-spin" />
-                ⚡ MAX SPEED MODE ⚡
-              </div>
-              <div className="text-slate-300 text-sm">
-                {language === 'ru' ? 'МАКСИМАЛЬНАЯ СКОРОСТЬ | СИНХРОНИЗАЦИЯ КАЖДЫЕ 100 ИГР' : 'MAXIMUM SPEED | AUTO-SYNC EVERY 100 GAMES'}
-              </div>
-              <div className="text-emerald-400 font-bold text-xl mt-2">
-                {(trainingData[0]?.games_played || 0) + gamesPlayed} TOTAL GAMES
-              </div>
-            </div>
-          </div>
-        )}
-
         {/* UNVIS MODE Indicator */}
         {unvisMode && !isAnalyzing && (
           <div className="text-center mb-6">
