@@ -13,6 +13,7 @@ import AIHand from '@/components/durak/AIHand';
 import PlayArea from '@/components/durak/PlayArea';
 import GameControls from '@/components/durak/GameControls';
 import TrumpIndicator from '@/components/durak/TrumpIndicator';
+import '@/components/durak/AILoader';
 
 import {
   createDeck,
