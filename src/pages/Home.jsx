@@ -14,7 +14,7 @@ import {
   Sparkles,
   Database
 } from 'lucide-react';
-import { autoTrainAHA } from '@/functions/autoTrainAHA';
+import { trainExpertAHA } from '@/functions/expertTraining';
 import { useQuery } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 
@@ -40,16 +40,24 @@ export default function Home() {
   
   // Auto-train on first load if AHA score is low
   useEffect(() => {
-    const hasAutoTrained = localStorage.getItem('aha_auto_trained');
-    if (!hasAutoTrained && ahaScore < 5000 && !isAutoTraining) {
+    const hasAutoTrained = localStorage.getItem('aha_expert_trained');
+    if (!hasAutoTrained && ahaScore < 7000 && !isAutoTraining) {
       setIsAutoTraining(true);
-      autoTrainAHA().then(() => {
-        localStorage.setItem('aha_auto_trained', 'true');
+      trainExpertAHA().then(() => {
+        localStorage.setItem('aha_expert_trained', 'true');
         setIsAutoTraining(false);
-        window.location.reload(); // Reload to show new score
+        window.location.reload();
       });
     }
   }, [ahaScore, isAutoTraining]);
+  
+  const handleManualTrain = () => {
+    setIsAutoTraining(true);
+    trainExpertAHA().then(() => {
+      setIsAutoTraining(false);
+      window.location.reload();
+    });
+  };
   
   const difficulties = [
     { id: 'easy', label: 'Easy', description: 'For beginners' },
@@ -230,12 +238,22 @@ export default function Home() {
                   Starts at 0 | Grows with thousands of training games | 10,000+ = World Champion
                 </div>
                 
-                <Link to={createPageUrl('Training')}>
-                  <Button className="w-full bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 text-white h-12 text-lg gap-2 border border-purple-500/50">
-                    <Brain className="w-5 h-5" />
-                    Train AHA AI
+                <div className="flex gap-2">
+                  <Link to={createPageUrl('Training')} className="flex-1">
+                    <Button className="w-full bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 text-white h-12 text-lg gap-2 border border-purple-500/50">
+                      <Brain className="w-5 h-5" />
+                      Train More
+                    </Button>
+                  </Link>
+                  <Button 
+                    onClick={handleManualTrain}
+                    disabled={isAutoTraining}
+                    className="bg-amber-600 hover:bg-amber-700 h-12 gap-2"
+                  >
+                    <Trophy className="w-5 h-5" />
+                    Expert Train
                   </Button>
-                </Link>
+                </div>
               </CardContent>
             </Card>
           </motion.div>

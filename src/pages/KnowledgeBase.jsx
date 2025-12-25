@@ -56,11 +56,33 @@ export default function KnowledgeBase() {
     ? knowledgeData 
     : knowledgeData.filter(k => k.decision_type === selectedFilter);
     
-  // Find best cards/decisions
+  // Find best cards/decisions - strategic analysis
   const bestDecisions = [...knowledgeData]
-    .filter(k => k.card_played && k.reward > 0)
-    .sort((a, b) => b.reward - a.reward)
-    .slice(0, 10);
+    .filter(k => k.card_played && k.reward > 0.5 && k.was_successful) // Only truly successful
+    .sort((a, b) => {
+      // Sort by reward, but prefer diverse strategies
+      const rewardDiff = b.reward - a.reward;
+      if (Math.abs(rewardDiff) < 0.1) {
+        // If similar rewards, prefer different card types
+        return 0;
+      }
+      return rewardDiff;
+    })
+    .slice(0, 15);
+    
+  // Get unique strategic patterns
+  const uniqueStrategies = [];
+  const seenPatterns = new Set();
+  for (const decision of bestDecisions) {
+    const pattern = `${decision.decision_type}_${Math.floor(decision.card_played.rank / 3)}`;
+    if (!seenPatterns.has(pattern)) {
+      seenPatterns.add(pattern);
+      uniqueStrategies.push(decision);
+      if (uniqueStrategies.length >= 10) break;
+    }
+  }
+  
+  const displayBest = uniqueStrategies.length > 0 ? uniqueStrategies : bestDecisions.slice(0, 10);
   
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-900 via-purple-950 to-slate-900 p-4">
@@ -244,17 +266,24 @@ export default function KnowledgeBase() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-white">
               <Award className="w-5 h-5 text-amber-400" />
-              Best Cards - Top Performing Decisions
+              Best Strategic Plays - Expert Patterns
             </CardTitle>
           </CardHeader>
           <CardContent>
-            {bestDecisions.length === 0 ? (
+            {displayBest.length === 0 ? (
               <div className="text-center py-8 text-slate-500">
                 No successful card plays logged yet. Train more to see best decisions!
               </div>
             ) : (
               <div className="space-y-3">
-                {bestDecisions.map((decision, idx) => (
+                {displayBest.map((decision, idx) => {
+                  const cardType = decision.card_played.rank >= 11 ? 'High Card' :
+                                  decision.card_played.rank >= 9 ? 'Medium Card' : 'Low Card';
+                  const strategyText = decision.decision_type === 'attack' 
+                    ? (decision.move_number === 1 ? 'Opening attack' : 'Pressure attack')
+                    : 'Strong defense';
+                  
+                  return (
                   <motion.div
                     key={decision.id}
                     className="bg-slate-800/50 rounded-lg p-4 border border-amber-600/30"
@@ -293,14 +322,16 @@ export default function KnowledgeBase() {
                     </div>
                     <div className="mt-3 pt-3 border-t border-slate-700">
                       <div className="text-xs text-slate-400">
-                        <span className="text-amber-400 font-bold">Why it's best:</span> High reward score indicates this move led to successful outcomes. 
-                        {decision.reward > 0.7 && " Exceptional strategic value! "}
-                        {decision.decision_type === 'defense' && decision.reward > 0.4 && "Perfect defense timing. "}
-                        AHA Score: {decision.aha_score_at_time || 0}
+                        <span className="text-amber-400 font-bold">Strategy:</span> {strategyText} with {cardType}.
+                        {decision.reward > 0.8 && " 🔥 Elite execution! "}
+                        {decision.decision_type === 'defense' && decision.reward > 0.7 && "Master defense technique. "}
+                        {decision.hand_size <= 2 && "Critical endgame play. "}
+                        Win rate: {(decision.reward * 100).toFixed(0)}%
                       </div>
                     </div>
                   </motion.div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </CardContent>
