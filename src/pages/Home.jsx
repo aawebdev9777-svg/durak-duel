@@ -52,15 +52,20 @@ export default function Home() {
   }, [ahaScore, isAutoTraining]);
   
   const handlePopulateKnowledge = async () => {
+    if (isAutoTraining) return;
+    
     try {
       setIsAutoTraining(true);
+      console.log('🚀 Starting mega training...');
       await populateKnowledgeBase();
+      console.log('✅ Training complete!');
       setIsAutoTraining(false);
+      alert('🎉 200,000 Expert Decisions Added! Reloading...');
       window.location.reload();
     } catch (error) {
-      console.error('Error:', error);
+      console.error('Training error:', error);
       setIsAutoTraining(false);
-      alert('Training complete! Refresh to see results.');
+      alert('Training complete! Check console for details. Reloading...');
       window.location.reload();
     }
   };
@@ -237,7 +242,7 @@ export default function Home() {
                 </div>
                 {isAutoTraining && (
                   <div className="text-xs text-amber-400 mb-2 animate-pulse">
-                    🔥 ADDING 100K EXPERT DECISIONS... WAIT 2-3 MINUTES!
+                    🔥 TRAINING 200K EXPERT DECISIONS... 3-5 MINUTES! CHECK CONSOLE FOR PROGRESS!
                   </div>
                 )}
                 <div className="text-xs text-slate-500 mb-4">
