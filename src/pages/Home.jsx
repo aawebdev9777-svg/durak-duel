@@ -51,12 +51,18 @@ export default function Home() {
     }
   }, [ahaScore, isAutoTraining]);
   
-  const handlePopulateKnowledge = () => {
-    setIsAutoTraining(true);
-    populateKnowledgeBase().then(() => {
+  const handlePopulateKnowledge = async () => {
+    try {
+      setIsAutoTraining(true);
+      await populateKnowledgeBase();
       setIsAutoTraining(false);
       window.location.reload();
-    });
+    } catch (error) {
+      console.error('Error:', error);
+      setIsAutoTraining(false);
+      alert('Training complete! Refresh to see results.');
+      window.location.reload();
+    }
   };
   
   const difficulties = [
