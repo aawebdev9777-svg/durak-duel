@@ -237,7 +237,7 @@ export default function Home() {
                 </div>
                 {isAutoTraining && (
                   <div className="text-xs text-amber-400 mb-2 animate-pulse">
-                    🔥 ADDING 1 MILLION EXPERT DECISIONS... THIS TAKES 5-10 MINUTES!
+                    🔥 ADDING 100K EXPERT DECISIONS... WAIT 2-3 MINUTES!
                   </div>
                 )}
                 <div className="text-xs text-slate-500 mb-4">

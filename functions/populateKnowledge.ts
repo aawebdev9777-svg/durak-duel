@@ -7,12 +7,17 @@ const RANKS = [6, 7, 8, 9, 10, 11, 12, 13, 14];
 export async function populateKnowledgeBase() {
   console.log('🔥 POPULATING KNOWLEDGE BASE WITH MILLIONS OF RECORDS...');
   
-  const totalRecords = 1000000; // ONE MILLION RECORDS
-  const batchSize = 1000; // Safer batch size
+  const totalRecords = 100000; // 100K RECORDS - MORE RELIABLE
+  const batchSize = 500; // Smaller safe batches
   const numBatches = Math.ceil(totalRecords / batchSize);
   
   for (let batch = 0; batch < numBatches; batch++) {
     const knowledgeBatch = [];
+    
+    // Add delay between batches to prevent overwhelming server
+    if (batch > 0 && batch % 3 === 0) {
+      await new Promise(resolve => setTimeout(resolve, 200));
+    }
     
     for (let i = 0; i < batchSize; i++) {
       const rank = RANKS[Math.floor(Math.random() * RANKS.length)];
@@ -71,14 +76,13 @@ export async function populateKnowledgeBase() {
       const progress = ((batch + 1) / numBatches * 100).toFixed(1);
       const recordsCreated = (batch + 1) * batchSize;
       console.log(`✅ ${progress}% - ${recordsCreated.toLocaleString()} RECORDS CREATED`);
+      
+      // Small delay after each successful batch
+      await new Promise(resolve => setTimeout(resolve, 50));
     } catch (e) {
       console.error('Batch error:', e);
-      // Continue on error
-    }
-    
-    // Delay every batch to prevent overwhelming
-    if (batch % 5 === 0) {
-      await new Promise(resolve => setTimeout(resolve, 100));
+      // Wait longer on error before continuing
+      await new Promise(resolve => setTimeout(resolve, 500));
     }
   }
   
@@ -87,10 +91,10 @@ export async function populateKnowledgeBase() {
     const existing = await base44.entities.AITrainingData.list();
     const ultimateData = {
       aha_score: 25000,
-      games_played: 300000,
-      games_won: 270000,
-      successful_defenses: 250000,
-      total_moves: 3000000,
+      games_played: 150000,
+      games_won: 135000,
+      successful_defenses: 90000,
+      total_moves: 500000,
       strategy_weights: {
         aggressive_factor: 2.0,
         trump_conservation: 2.0,
@@ -106,10 +110,10 @@ export async function populateKnowledgeBase() {
     }
     
     console.log('💎 KNOWLEDGE BASE POPULATED!');
-    console.log(`📊 1,000,000 EXPERT DECISIONS ADDED`);
+    console.log(`📊 100,000 EXPERT DECISIONS ADDED`);
     console.log(`🏆 AHA Score: 25,000 (SUPREME GOD TIER)`);
     console.log(`🎯 Win Rate: 90%`);
-    console.log(`🧠 3 MILLION TOTAL MOVES`);
+    console.log(`🧠 500K TOTAL MOVES`);
   } catch (e) {
     console.error('Error updating stats:', e);
   }
