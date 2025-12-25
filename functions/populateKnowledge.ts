@@ -8,7 +8,7 @@ export async function populateKnowledgeBase() {
   console.log('🔥 POPULATING KNOWLEDGE BASE WITH MILLIONS OF RECORDS...');
   
   const totalRecords = 1000000; // ONE MILLION RECORDS
-  const batchSize = 10000; // Massive batches
+  const batchSize = 1000; // Safer batch size
   const numBatches = Math.ceil(totalRecords / batchSize);
   
   for (let batch = 0; batch < numBatches; batch++) {
@@ -73,11 +73,12 @@ export async function populateKnowledgeBase() {
       console.log(`✅ ${progress}% - ${recordsCreated.toLocaleString()} RECORDS CREATED`);
     } catch (e) {
       console.error('Batch error:', e);
+      // Continue on error
     }
     
-    // Small delay to prevent overwhelming the system
-    if (batch % 10 === 0) {
-      await new Promise(resolve => setTimeout(resolve, 50));
+    // Delay every batch to prevent overwhelming
+    if (batch % 5 === 0) {
+      await new Promise(resolve => setTimeout(resolve, 100));
     }
   }
   
