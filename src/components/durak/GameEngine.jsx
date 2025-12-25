@@ -120,9 +120,18 @@ export function evaluateCard(card, trumpSuit, hand, strategyWeights = null) {
   return score;
 }
 
-export function aiSelectAttack(hand, tableCards, trumpSuit, difficulty, strategyWeights = null, learnedData = null) {
+export function aiSelectAttack(hand, tableCards, trumpSuit, difficulty, strategyWeights = null, learnedData = null, deckSize = 36, opponentHandSize = 6) {
   const validCards = getValidAttackCards(hand, tableCards);
   if (validCards.length === 0) return null;
+  
+  // Use advanced AI if available
+  if (typeof window !== 'undefined' && window.AIStrategyEngine) {
+    const ai = new window.AIStrategyEngine(difficulty, learnedData);
+    const decision = ai.makeDecision(hand, {
+      trumpSuit, tableCards, deckSize, opponentHandSize, ourHandSize: hand.length
+    }, 'attack');
+    if (decision) return decision;
+  }
   
   // Sort by value (lower = better to play first)
   const sorted = [...validCards].sort((a, b) => {
@@ -187,9 +196,18 @@ export function aiSelectAttack(hand, tableCards, trumpSuit, difficulty, strategy
   }
 }
 
-export function aiSelectDefense(hand, attackCard, trumpSuit, difficulty, strategyWeights = null, learnedData = null) {
+export function aiSelectDefense(hand, attackCard, trumpSuit, difficulty, strategyWeights = null, learnedData = null, deckSize = 36, opponentHandSize = 6) {
   const validCards = getValidDefenseCards(hand, attackCard, trumpSuit);
   if (validCards.length === 0) return null;
+  
+  // Use advanced AI if available
+  if (typeof window !== 'undefined' && window.AIStrategyEngine) {
+    const ai = new window.AIStrategyEngine(difficulty, learnedData);
+    const decision = ai.makeDecision(hand, {
+      trumpSuit, tableCards: [{ attack: attackCard, defense: null }], deckSize, opponentHandSize, ourHandSize: hand.length
+    }, 'defend');
+    if (decision) return decision;
+  }
   
   // Sort by value (lower = better to use for defense)
   const sorted = [...validCards].sort((a, b) => {
