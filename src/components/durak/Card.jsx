@@ -63,12 +63,14 @@ export default function Card({
 
   return (
     <motion.div
-      className={`${baseClasses} rounded-lg bg-gradient-to-br from-white via-gray-50 to-gray-100 border-2 border-gray-400 shadow-xl cursor-pointer flex flex-col p-1.5 md:p-2 relative overflow-hidden
-        ${selectable ? 'hover:shadow-2xl hover:-translate-y-2 transition-all hover:border-amber-400' : ''}
-        ${selected ? 'ring-4 ring-amber-500 -translate-y-3 border-amber-400' : ''}
+      className={`${baseClasses} rounded-lg bg-white border-3 shadow-2xl cursor-pointer flex flex-col relative overflow-hidden
+        ${selectable ? 'hover:shadow-2xl hover:-translate-y-2 transition-all hover:border-amber-400 hover:z-10' : ''}
+        ${selected ? 'ring-4 ring-amber-500 -translate-y-3 border-amber-400 z-20' : ''}
       `}
       style={{ 
         backgroundColor: '#FFFFFF',
+        borderColor: card.suit === 'hearts' || card.suit === 'diamonds' ? '#DC2626' : '#1E293B',
+        borderWidth: '3px',
         ...style 
       }}
       onClick={selectable ? onClick : undefined}
@@ -78,31 +80,35 @@ export default function Card({
       animate={{ scale: 1, opacity: 1, rotateY: 0 }}
       transition={{ type: "spring", stiffness: 300, damping: 20 }}
     >
-      {/* Top left - BIGGER AND BOLDER */}
-      <div className={`flex flex-col items-center leading-none ${suitColors[card.suit]}`}>
-        <span className={`font-black ${small ? 'text-lg' : 'text-2xl md:text-3xl'}`}>
-          {rankDisplay[card.rank]}
-        </span>
-        <span className={small ? 'text-xl' : 'text-2xl md:text-3xl'}>
+      {/* Top Badge - ALWAYS VISIBLE */}
+      <div className={`absolute top-0 left-0 right-0 ${card.suit === 'hearts' || card.suit === 'diamonds' ? 'bg-red-600' : 'bg-slate-800'} text-white font-black text-center py-1 shadow-lg z-10`}>
+        <div className="flex items-center justify-center gap-1">
+          <span className={small ? 'text-base' : 'text-xl md:text-2xl'}>
+            {rankDisplay[card.rank]}
+          </span>
+          <span className={small ? 'text-base' : 'text-xl md:text-2xl'}>
+            {suitSymbols[card.suit]}
+          </span>
+        </div>
+      </div>
+
+      {/* Large Center Symbol */}
+      <div className={`flex-1 flex items-center justify-center mt-8 ${suitColors[card.suit]}`}>
+        <span className={small ? 'text-5xl' : 'text-7xl md:text-8xl font-bold'}>
           {suitSymbols[card.suit]}
         </span>
       </div>
 
-      {/* Center - MUCH BIGGER */}
-      <div className={`flex-1 flex items-center justify-center ${suitColors[card.suit]}`}>
-        <span className={small ? 'text-4xl' : 'text-6xl md:text-7xl'}>
-          {suitSymbols[card.suit]}
-        </span>
-      </div>
-
-      {/* Bottom right - BIGGER AND BOLDER */}
-      <div className={`flex flex-col items-center leading-none rotate-180 ${suitColors[card.suit]}`}>
-        <span className={`font-black ${small ? 'text-lg' : 'text-2xl md:text-3xl'}`}>
-          {rankDisplay[card.rank]}
-        </span>
-        <span className={small ? 'text-xl' : 'text-2xl md:text-3xl'}>
-          {suitSymbols[card.suit]}
-        </span>
+      {/* Bottom Badge - ALWAYS VISIBLE */}
+      <div className={`absolute bottom-0 left-0 right-0 ${card.suit === 'hearts' || card.suit === 'diamonds' ? 'bg-red-600' : 'bg-slate-800'} text-white font-black text-center py-1 shadow-lg rotate-180 z-10`}>
+        <div className="flex items-center justify-center gap-1">
+          <span className={small ? 'text-base' : 'text-xl md:text-2xl'}>
+            {rankDisplay[card.rank]}
+          </span>
+          <span className={small ? 'text-base' : 'text-xl md:text-2xl'}>
+            {suitSymbols[card.suit]}
+          </span>
+        </div>
       </div>
     </motion.div>
   );
