@@ -10,7 +10,7 @@ export default function PlayerHand({
   isActive = false,
   label = "Your Hand"
 }) {
-  const maxSpread = Math.min(cards.length * 45, 400);
+  const maxSpread = Math.min(cards.length * 60, 500);
   const cardWidth = 80;
   const overlap = cards.length > 1 ? (maxSpread - cardWidth) / (cards.length - 1) : 0;
   
@@ -37,15 +37,17 @@ export default function PlayerHand({
           return (
             <motion.div
               key={card.id}
-              className="absolute"
+              className="absolute hover:z-50"
               style={{
                 left: `calc(50% + ${(index - centerOffset) * overlap}px - 40px)`,
-                zIndex: index,
+                zIndex: isSelected ? 100 : index,
               }}
               animate={{
                 rotate: rotation,
-                y: isSelected ? -20 : 0
+                y: isSelected ? -30 : 0,
+                scale: isSelected ? 1.1 : 1
               }}
+              whileHover={isValid ? { y: -15, scale: 1.05, zIndex: 99 } : {}}
               transition={{ type: "spring", stiffness: 300, damping: 20 }}
             >
               <Card
