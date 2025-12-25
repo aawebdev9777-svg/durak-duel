@@ -4,6 +4,8 @@ import { Button } from '@/components/ui/button';
 import { ArrowLeft, RotateCcw, Trophy, Frown } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
+import { base44 } from '@/api/base44Client';
+import { useQuery } from '@tanstack/react-query';
 
 import Card from '@/components/durak/Card';
 import PlayerHand from '@/components/durak/PlayerHand';
@@ -40,8 +42,34 @@ export default function Game() {
   const [gameMessage, setGameMessage] = useState('');
   const [aiThinking, setAiThinking] = useState(null);
   const [gameOver, setGameOver] = useState(null);
+  const [trainedWeights, setTrainedWeights] = useState(null);
+  const [learnedKnowledge, setLearnedKnowledge] = useState(null);
   
   const gameRef = useRef(null);
+  
+  // Load trained AI data if using AHA difficulty
+  const { data: trainingData = [] } = useQuery({
+    queryKey: ['aiTraining'],
+    queryFn: () => base44.entities.AITrainingData.list(),
+    initialData: [],
+    enabled: difficulty === 'aha'
+  });
+  
+  const { data: knowledgeData = [] } = useQuery({
+    queryKey: ['aiKnowledge'],
+    queryFn: () => base44.entities.AIKnowledge.filter({ was_successful: true }, '-reward', 50),
+    initialData: [],
+    enabled: difficulty === 'aha'
+  });
+  
+  useEffect(() => {
+    if (difficulty === 'aha' && trainingData.length > 0) {
+      setTrainedWeights(trainingData[0].strategy_weights);
+    }
+    if (difficulty === 'aha' && knowledgeData.length > 0) {
+      setLearnedKnowledge(knowledgeData);
+    }
+  }, [difficulty, trainingData, knowledgeData]);
   
   const initGame = useCallback(() => {
     const deck = createDeck();
@@ -182,7 +210,7 @@ export default function Game() {
         // AI attacking
         if (state.tableCards.length === 0) {
           // Initial attack
-          const attackCard = aiSelectAttack(state.hands[aiPlayer], [], state.trumpSuit, aiDifficulty);
+          const attackCard = aiSelectAttack(state.hands[aiPlayer], [], state.trumpSuit, aiDifficulty, trainedWeights, learnedKnowledge);
           if (attackCard) {
             const newHands = [...state.hands];
             newHands[aiPlayer] = newHands[aiPlayer].filter(c => c.id !== attackCard.id);
@@ -201,11 +229,13 @@ export default function Game() {
             state.tableCards,
             state.hands[state.defender].length,
             state.trumpSuit,
-            aiDifficulty
+            aiDifficulty,
+            trainedWeights,
+            learnedKnowledge
           );
           
           if (shouldContinue) {
-            const attackCard = aiSelectAttack(state.hands[aiPlayer], state.tableCards, state.trumpSuit, aiDifficulty);
+            const attackCard = aiSelectAttack(state.hands[aiPlayer], state.tableCards, state.trumpSuit, aiDifficulty, trainedWeights, learnedKnowledge);
             if (attackCard) {
               const newHands = [...state.hands];
               newHands[aiPlayer] = newHands[aiPlayer].filter(c => c.id !== attackCard.id);
@@ -231,7 +261,9 @@ export default function Game() {
             state.hands[aiPlayer],
             undefended.attack,
             state.trumpSuit,
-            aiDifficulty
+            aiDifficulty,
+            trainedWeights,
+            learnedKnowledge
           );
           
           if (defenseCard) {
@@ -268,7 +300,7 @@ export default function Game() {
     }, AI_THINK_TIME);
     
     return () => clearTimeout(timer);
-  }, [gameState, gameOver, difficulty, isChampionMode, updateGameState, endRound]);
+  }, [gameState, gameOver, difficulty, isChampionMode, updateGameState, endRound, trainedWeights, learnedKnowledge]);
   
   const handleCardSelect = (card) => {
     setSelectedCard(prev => prev?.id === card.id ? null : card);
