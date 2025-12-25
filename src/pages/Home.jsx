@@ -14,7 +14,7 @@ import {
   Sparkles,
   Database
 } from 'lucide-react';
-import { trainExpertAHA } from '@/functions/expertTraining';
+import { populateKnowledgeBase } from '@/functions/populateKnowledge';
 import { useQuery } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 
@@ -38,22 +38,22 @@ export default function Home() {
     }
   }, [trainingData]);
   
-  // Auto-train on first load if AHA score is low
+  // Auto-populate knowledge base on first load
   useEffect(() => {
-    const hasAutoTrained = localStorage.getItem('aha_expert_trained');
-    if (!hasAutoTrained && ahaScore < 7000 && !isAutoTraining) {
+    const hasPopulated = localStorage.getItem('aha_knowledge_populated');
+    if (!hasPopulated && ahaScore < 20000 && !isAutoTraining) {
       setIsAutoTraining(true);
-      trainExpertAHA().then(() => {
-        localStorage.setItem('aha_expert_trained', 'true');
+      populateKnowledgeBase().then(() => {
+        localStorage.setItem('aha_knowledge_populated', 'true');
         setIsAutoTraining(false);
         window.location.reload();
       });
     }
   }, [ahaScore, isAutoTraining]);
   
-  const handleManualTrain = () => {
+  const handlePopulateKnowledge = () => {
     setIsAutoTraining(true);
-    trainExpertAHA().then(() => {
+    populateKnowledgeBase().then(() => {
       setIsAutoTraining(false);
       window.location.reload();
     });
@@ -231,7 +231,7 @@ export default function Home() {
                 </div>
                 {isAutoTraining && (
                   <div className="text-xs text-amber-400 mb-2 animate-pulse">
-                    🚀 Building world champion AI... This will take a moment!
+                    🔥 POPULATING 500,000 EXPERT DECISIONS... PLEASE WAIT!
                   </div>
                 )}
                 <div className="text-xs text-slate-500 mb-4">
@@ -239,19 +239,19 @@ export default function Home() {
                 </div>
                 
                 <div className="flex gap-2">
-                  <Link to={createPageUrl('Training')} className="flex-1">
-                    <Button className="w-full bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 text-white h-12 text-lg gap-2 border border-purple-500/50">
-                      <Brain className="w-5 h-5" />
-                      Train More
+                  <Link to={createPageUrl('KnowledgeBase')} className="flex-1">
+                    <Button className="w-full bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white h-12 text-lg gap-2 border border-blue-500/50">
+                      <Database className="w-5 h-5" />
+                      View Knowledge
                     </Button>
                   </Link>
                   <Button 
-                    onClick={handleManualTrain}
+                    onClick={handlePopulateKnowledge}
                     disabled={isAutoTraining}
                     className="bg-amber-600 hover:bg-amber-700 h-12 gap-2"
                   >
                     <Trophy className="w-5 h-5" />
-                    Expert Train
+                    Mega Train
                   </Button>
                 </div>
               </CardContent>
@@ -259,44 +259,7 @@ export default function Home() {
           </motion.div>
         </div>
         
-        {/* AI Training Mode */}
-        <motion.div
-          initial={{ opacity: 0, y: 30 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.4 }}
-        >
-          <Card className="bg-slate-800/30 border-slate-700/50 backdrop-blur-sm">
-            <CardContent className="p-6">
-              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <div className="flex items-center gap-4">
-                  <div className="p-4 rounded-xl bg-purple-500/20">
-                    <Brain className="w-8 h-8 text-purple-400" />
-                  </div>
-                  <div>
-                    <h2 className="text-xl font-bold text-white">AI Training Arena</h2>
-                    <p className="text-slate-400">
-                      Watch AI players battle each other and learn advanced strategies
-                    </p>
-                  </div>
-                </div>
-                <div className="flex gap-2">
-                  <Link to={createPageUrl('KnowledgeBase')}>
-                    <Button variant="outline" className="border-blue-500/50 text-blue-400 hover:bg-blue-500/20 gap-2">
-                      <Database className="w-4 h-4" />
-                      Knowledge Base
-                    </Button>
-                  </Link>
-                  <Link to={createPageUrl('Training')}>
-                    <Button variant="outline" className="border-purple-500/50 text-purple-400 hover:bg-purple-500/20 gap-2">
-                      <Brain className="w-4 h-4" />
-                      Watch Training
-                    </Button>
-                  </Link>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </motion.div>
+
         
         {/* Rules hint */}
         <motion.div
