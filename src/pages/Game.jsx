@@ -113,7 +113,7 @@ export default function Game() {
     });
   }, []);
   
-  const checkAndHandleGameOver = useCallback((hands, deckEmpty) => {
+  const checkAndHandleGameOver = useCallback(async (hands, deckEmpty) => {
     const result = checkGameOver(hands, deckEmpty);
     if (result.over) {
       setGameOver({
@@ -121,10 +121,26 @@ export default function Game() {
         isPlayerDurak: result.durak === 0,
         isPlayerWinner: result.durak !== 0 && result.durak !== null
       });
+      
+      // Log this game to improve AI if playing against AHA
+      if (difficulty === 'aha' && trainingData.length > 0) {
+        try {
+          const currentData = trainingData[0];
+          await base44.entities.AITrainingData.update(currentData.id, {
+            games_played: (currentData.games_played || 0) + 1,
+            games_won: (currentData.games_won || 0) + (result.durak !== 0 ? 1 : 0),
+            aha_score: result.durak === 0 
+              ? Math.max(0, (currentData.aha_score || 0) + 15) // AI won, increase score
+              : Math.max(0, (currentData.aha_score || 0) - 8), // AI lost, slightly decrease
+            last_training_date: new Date().toISOString()
+          });
+        } catch (e) {}
+      }
+      
       return true;
     }
     return false;
-  }, []);
+  }, [difficulty, trainingData]);
   
   const endRound = useCallback((defenderTook = false) => {
     const state = gameRef.current;

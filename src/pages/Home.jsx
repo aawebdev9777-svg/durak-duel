@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -14,12 +14,42 @@ import {
   Sparkles,
   Database
 } from 'lucide-react';
+import { autoTrainAHA } from '@/functions/autoTrainAHA';
+import { useQuery } from '@tanstack/react-query';
+import { base44 } from '@/api/base44Client';
 
 const suitSymbols = ['♠', '♥', '♦', '♣'];
 
 export default function Home() {
   const [numPlayers, setNumPlayers] = useState(1);
   const [difficulty, setDifficulty] = useState('medium');
+  const [isAutoTraining, setIsAutoTraining] = useState(false);
+  const [ahaScore, setAhaScore] = useState(0);
+  
+  const { data: trainingData = [] } = useQuery({
+    queryKey: ['aiTraining'],
+    queryFn: () => base44.entities.AITrainingData.list(),
+    initialData: []
+  });
+  
+  useEffect(() => {
+    if (trainingData.length > 0) {
+      setAhaScore(trainingData[0].aha_score || 0);
+    }
+  }, [trainingData]);
+  
+  // Auto-train on first load if AHA score is low
+  useEffect(() => {
+    const hasAutoTrained = localStorage.getItem('aha_auto_trained');
+    if (!hasAutoTrained && ahaScore < 5000 && !isAutoTraining) {
+      setIsAutoTraining(true);
+      autoTrainAHA().then(() => {
+        localStorage.setItem('aha_auto_trained', 'true');
+        setIsAutoTraining(false);
+        window.location.reload(); // Reload to show new score
+      });
+    }
+  }, [ahaScore, isAutoTraining]);
   
   const difficulties = [
     { id: 'easy', label: 'Easy', description: 'For beginners' },
@@ -189,8 +219,13 @@ export default function Home() {
                 
                 <div className="flex items-center gap-2 mb-2 text-purple-400/80 text-sm">
                   <Sparkles className="w-4 h-4" />
-                  <span>Current AHA Score: Loading...</span>
+                  <span>Current AHA Score: {isAutoTraining ? 'Training...' : ahaScore}</span>
                 </div>
+                {isAutoTraining && (
+                  <div className="text-xs text-amber-400 mb-2 animate-pulse">
+                    🚀 Building world champion AI... This will take a moment!
+                  </div>
+                )}
                 <div className="text-xs text-slate-500 mb-4">
                   Starts at 0 | Grows with thousands of training games | 10,000+ = World Champion
                 </div>

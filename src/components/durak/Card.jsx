@@ -78,29 +78,29 @@ export default function Card({
       animate={{ scale: 1, opacity: 1, rotateY: 0 }}
       transition={{ type: "spring", stiffness: 300, damping: 20 }}
     >
-      {/* Top left */}
+      {/* Top left - BIGGER AND BOLDER */}
       <div className={`flex flex-col items-center leading-none ${suitColors[card.suit]}`}>
-        <span className={`font-bold ${small ? 'text-xs' : 'text-sm md:text-base'}`}>
+        <span className={`font-black ${small ? 'text-lg' : 'text-2xl md:text-3xl'}`}>
           {rankDisplay[card.rank]}
         </span>
-        <span className={small ? 'text-sm' : 'text-base md:text-lg'}>
+        <span className={small ? 'text-xl' : 'text-2xl md:text-3xl'}>
           {suitSymbols[card.suit]}
         </span>
       </div>
-      
-      {/* Center */}
+
+      {/* Center - MUCH BIGGER */}
       <div className={`flex-1 flex items-center justify-center ${suitColors[card.suit]}`}>
-        <span className={small ? 'text-2xl' : 'text-3xl md:text-4xl'}>
+        <span className={small ? 'text-4xl' : 'text-6xl md:text-7xl'}>
           {suitSymbols[card.suit]}
         </span>
       </div>
-      
-      {/* Bottom right */}
+
+      {/* Bottom right - BIGGER AND BOLDER */}
       <div className={`flex flex-col items-center leading-none rotate-180 ${suitColors[card.suit]}`}>
-        <span className={`font-bold ${small ? 'text-xs' : 'text-sm md:text-base'}`}>
+        <span className={`font-black ${small ? 'text-lg' : 'text-2xl md:text-3xl'}`}>
           {rankDisplay[card.rank]}
         </span>
-        <span className={small ? 'text-sm' : 'text-base md:text-lg'}>
+        <span className={small ? 'text-xl' : 'text-2xl md:text-3xl'}>
           {suitSymbols[card.suit]}
         </span>
       </div>
