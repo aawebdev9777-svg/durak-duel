@@ -165,18 +165,24 @@ export default function AIBattle() {
           const newTimesWon = existingTactic.times_won + (wonGame ? 1 : 0);
           const newSuccessRate = newTimesWon / newTimesUsed;
 
-          // Confidence grows significantly with wins, drops slightly with losses
-          let confidenceChange = wonGame ? 0.12 : -0.02;
-          const newConfidence = Math.max(0.15, Math.min(0.99, existingTactic.confidence + confidenceChange));
+          // Confidence grows with wins, drops significantly with losses
+          let confidenceChange = wonGame ? 0.12 : -0.08;
+          const newConfidence = Math.max(0.05, Math.min(0.99, existingTactic.confidence + confidenceChange));
 
           try {
-            await base44.entities.AHATactic.update(existingTactic.id, {
-              times_used: newTimesUsed,
-              times_won: newTimesWon,
-              success_rate: newSuccessRate,
-              confidence: newConfidence
-            });
-            await new Promise(resolve => setTimeout(resolve, 300));
+            // Delete failed tactics
+            if (newTimesUsed >= 10 && (newSuccessRate < 0.35 || newConfidence < 0.1)) {
+              await base44.entities.AHATactic.delete(existingTactic.id);
+              await new Promise(resolve => setTimeout(resolve, 300));
+            } else {
+              await base44.entities.AHATactic.update(existingTactic.id, {
+                times_used: newTimesUsed,
+                times_won: newTimesWon,
+                success_rate: newSuccessRate,
+                confidence: newConfidence
+              });
+              await new Promise(resolve => setTimeout(resolve, 300));
+            }
             break; // Only update first similar tactic per new tactic
           } catch (error) {
             console.error('Tactic update failed:', error);
