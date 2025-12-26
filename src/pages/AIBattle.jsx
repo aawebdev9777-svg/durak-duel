@@ -150,45 +150,30 @@ export default function AIBattle() {
       confidence: 0.3 // Start low
     });
     
-    // Check for similar tactics FIRST, only create if none exist
+    // ONLY UPDATE EXISTING TACTICS - don't create new ones
     for (const newTactic of newTactics) {
-      let foundSimilar = false;
+      // Find exact match first by name
+      const exactMatch = tactics.find(t => t.tactic_name === newTactic.tactic_name);
+      
+      if (exactMatch) {
+        const newTimesUsed = exactMatch.times_used + 1;
+        const newTimesWon = exactMatch.times_won + (wonGame ? 1 : 0);
+        const newSuccessRate = newTimesWon / newTimesUsed;
 
-      for (const existingTactic of tactics) {
-        const similarity = calculateTacticSimilarity(existingTactic, newTactic);
-        if (similarity > 0.7) {
-          foundSimilar = true;
-          const newTimesUsed = existingTactic.times_used + 1;
-          const newTimesWon = existingTactic.times_won + (wonGame ? 1 : 0);
-          const newSuccessRate = newTimesWon / newTimesUsed;
+        // Confidence rises and falls naturally
+        let confidenceChange = wonGame ? 0.12 : -0.08;
+        const newConfidence = Math.max(0.01, Math.min(0.99, exactMatch.confidence + confidenceChange));
 
-          // Confidence rises and falls naturally
-          let confidenceChange = wonGame ? 0.12 : -0.08;
-          const newConfidence = Math.max(0.01, Math.min(0.99, existingTactic.confidence + confidenceChange));
-
-          try {
-            await base44.entities.AHATactic.update(existingTactic.id, {
-              times_used: newTimesUsed,
-              times_won: newTimesWon,
-              success_rate: newSuccessRate,
-              confidence: newConfidence
-            });
-            await new Promise(resolve => setTimeout(resolve, 300));
-            break; // Only update first similar tactic
-          } catch (error) {
-            console.error('Tactic update failed:', error);
-          }
-        }
-      }
-
-      // Only create new tactic if no similar one was found
-      if (!foundSimilar && tactics.length < 50) {
         try {
-          await base44.entities.AHATactic.create(newTactic);
-          await new Promise(resolve => setTimeout(resolve, 300));
-          break; // Only create 1 new tactic per game
+          await base44.entities.AHATactic.update(exactMatch.id, {
+            times_used: newTimesUsed,
+            times_won: newTimesWon,
+            success_rate: newSuccessRate,
+            confidence: newConfidence
+          });
+          break; // Only update once per game
         } catch (error) {
-          console.error('Tactic save failed:', error);
+          console.error('Tactic update failed:', error);
         }
       }
     }
@@ -459,12 +444,12 @@ export default function AIBattle() {
             }, ...prev.slice(0, 9)]);
           }
           
-          // Update AHA score
-          const currentScore = trainingData.length > 0 ? trainingData[0].aha_score : 0;
           // Update AHA score based on performance
           const newScore = winner === 'aha' 
-            ? currentScore + 50
-            : Math.max(0, currentScore - 10);
+            ? sessionAhaScore + 50
+            : Math.max(0, sessionAhaScore - 10);
+          
+          setSessionAhaScore(newScore);
 
           // Learn tactics from the game
           await learnTacticsFromGame(state, winner, state.moveCount);
