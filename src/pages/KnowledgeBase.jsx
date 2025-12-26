@@ -37,20 +37,6 @@ export default function KnowledgeBase() {
     initialData: []
   });
   
-  // Auto-populate knowledge if empty
-  React.useEffect(() => {
-    if (knowledgeData.length === 0) {
-      (async () => {
-        try {
-          const { addMassiveKnowledge } = await import('@/functions/addMassiveKnowledge');
-          await addMassiveKnowledge();
-        } catch (e) {
-          console.error('Auto-populate failed:', e);
-        }
-      })();
-    }
-  }, [knowledgeData.length]);
-  
   // Calculate real stats from actual data
   const currentData = trainingData.length > 0 ? {
     ...trainingData[0],
