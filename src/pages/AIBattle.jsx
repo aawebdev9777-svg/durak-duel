@@ -42,6 +42,7 @@ export default function AIBattle() {
   const [learnedData, setLearnedData] = useState(null);
   const [matchHistory, setMatchHistory] = useState([]);
   const [sessionAhaScore, setSessionAhaScore] = useState(0);
+  const [timeFilter, setTimeFilter] = useState('all');
   
   const gameRef = useRef(null);
   const isRunningRef = useRef(false);
@@ -499,6 +500,34 @@ export default function AIBattle() {
   const displayTotalGames = (trainingData.length > 0 ? trainingData[0].games_played : 0) + (isRunning ? stats.totalGames : 0);
   const winRate = stats.totalGames > 0 ? ((stats.ahaWins / stats.totalGames) * 100).toFixed(1) : 0;
   
+  // Filter sessions by time period
+  const getFilteredSessions = () => {
+    const now = new Date();
+    if (timeFilter === 'all') return sessions;
+    
+    const filterDate = new Date();
+    switch(timeFilter) {
+      case '1d':
+        filterDate.setDate(now.getDate() - 1);
+        break;
+      case '1w':
+        filterDate.setDate(now.getDate() - 7);
+        break;
+      case '1m':
+        filterDate.setMonth(now.getMonth() - 1);
+        break;
+      case '1y':
+        filterDate.setFullYear(now.getFullYear() - 1);
+        break;
+      default:
+        return sessions;
+    }
+    
+    return sessions.filter(s => new Date(s.session_date) >= filterDate);
+  };
+  
+  const filteredSessions = getFilteredSessions();
+  
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-900 via-purple-950 to-slate-900 p-4">
       <div className="flex justify-between items-center mb-6 max-w-6xl mx-auto">
@@ -544,6 +573,91 @@ export default function AIBattle() {
       </div>
       
       <div className="max-w-6xl mx-auto space-y-6">
+        {/* Win Rate Progress Graph */}
+        <UICard className="bg-gradient-to-br from-cyan-900/30 to-slate-800/40 border-cyan-700/50">
+          <CardHeader>
+            <CardTitle className="flex items-center justify-between text-white">
+              <div className="flex items-center gap-2">
+                <Activity className="w-5 h-5 text-cyan-400" />
+                Win Rate Progress
+              </div>
+              <div className="flex gap-2">
+                {[
+                  { label: '1D', value: '1d' },
+                  { label: '1W', value: '1w' },
+                  { label: '1M', value: '1m' },
+                  { label: '1Y', value: '1y' },
+                  { label: 'All', value: 'all' }
+                ].map(filter => (
+                  <button
+                    key={filter.value}
+                    onClick={() => setTimeFilter(filter.value)}
+                    className={`px-3 py-1 rounded text-xs transition-all ${
+                      timeFilter === filter.value
+                        ? 'bg-cyan-600 text-white'
+                        : 'bg-slate-700 text-slate-400 hover:bg-slate-600'
+                    }`}
+                  >
+                    {filter.label}
+                  </button>
+                ))}
+              </div>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {filteredSessions.length === 0 ? (
+              <div className="text-center py-8 text-slate-500">
+                Complete a training session to see win rate progress
+              </div>
+            ) : (
+              <div className="h-64">
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={[...filteredSessions].reverse()}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
+                    <XAxis 
+                      dataKey="session_date" 
+                      stroke="#94a3b8"
+                      tick={{ fill: '#94a3b8', fontSize: 12 }}
+                      tickFormatter={(value) => new Date(value).toLocaleDateString()}
+                    />
+                    <YAxis 
+                      stroke="#94a3b8"
+                      tick={{ fill: '#94a3b8', fontSize: 12 }}
+                      domain={[0, 100]}
+                      label={{ value: 'Win Rate %', angle: -90, position: 'insideLeft', fill: '#94a3b8' }}
+                    />
+                    <Tooltip 
+                      contentStyle={{ 
+                        backgroundColor: '#1e293b', 
+                        border: '1px solid #475569',
+                        borderRadius: '8px',
+                        color: '#fff'
+                      }}
+                      formatter={(value) => [`${value.toFixed(1)}%`, 'Win Rate']}
+                      labelFormatter={(label) => new Date(label).toLocaleString()}
+                    />
+                    <ReferenceLine 
+                      y={75} 
+                      stroke="#10b981" 
+                      strokeDasharray="5 5" 
+                      strokeWidth={2}
+                      label={{ value: 'Target: 75%', position: 'right', fill: '#10b981', fontSize: 12 }}
+                    />
+                    <Line 
+                      type="linear" 
+                      dataKey="win_rate" 
+                      stroke="#06b6d4" 
+                      strokeWidth={2}
+                      dot={{ fill: '#06b6d4', r: 3 }}
+                      activeDot={{ r: 5 }}
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+            )}
+          </CardContent>
+        </UICard>
+      
         {/* Stats Grid */}
         <div className="grid md:grid-cols-6 gap-4">
           <UICard className="bg-gradient-to-br from-purple-900/40 to-purple-800/30 border-purple-700/50">
@@ -785,68 +899,7 @@ export default function AIBattle() {
           </CardContent>
         </UICard>
         
-        {/* Win Rate Progress Graph */}
-        <UICard className="bg-gradient-to-br from-cyan-900/30 to-slate-800/40 border-cyan-700/50">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-white">
-              <Activity className="w-5 h-5 text-cyan-400" />
-              Win Rate Progress
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {sessions.length === 0 ? (
-              <div className="text-center py-8 text-slate-500">
-                Complete a training session to see win rate progress
-              </div>
-            ) : (
-              <div className="h-64">
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={[...sessions].reverse()}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
-                    <XAxis 
-                      dataKey="session_date" 
-                      stroke="#94a3b8"
-                      tick={{ fill: '#94a3b8', fontSize: 12 }}
-                      tickFormatter={(value) => new Date(value).toLocaleDateString()}
-                    />
-                    <YAxis 
-                      stroke="#94a3b8"
-                      tick={{ fill: '#94a3b8', fontSize: 12 }}
-                      domain={[0, 100]}
-                      label={{ value: 'Win Rate %', angle: -90, position: 'insideLeft', fill: '#94a3b8' }}
-                    />
-                    <Tooltip 
-                      contentStyle={{ 
-                        backgroundColor: '#1e293b', 
-                        border: '1px solid #475569',
-                        borderRadius: '8px',
-                        color: '#fff'
-                      }}
-                      formatter={(value) => [`${value.toFixed(1)}%`, 'Win Rate']}
-                      labelFormatter={(label) => new Date(label).toLocaleString()}
-                    />
-                    <ReferenceLine 
-                      y={75} 
-                      stroke="#10b981" 
-                      strokeDasharray="5 5" 
-                      strokeWidth={2}
-                      label={{ value: 'Target: 75%', position: 'right', fill: '#10b981', fontSize: 12 }}
-                    />
-                    <Line 
-                      type="linear" 
-                      dataKey="win_rate" 
-                      stroke="#06b6d4" 
-                      strokeWidth={2}
-                      dot={{ fill: '#06b6d4', r: 3 }}
-                      activeDot={{ r: 5 }}
-                    />
-                  </LineChart>
-                </ResponsiveContainer>
-              </div>
-            )}
-          </CardContent>
-        </UICard>
-        
+
         {/* Match History */}
         <UICard className="bg-slate-800/40 border-slate-700/50">
           <CardHeader>
