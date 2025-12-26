@@ -107,7 +107,7 @@ export default function AIBattle() {
         table_state: JSON.stringify(move.tableState),
         decision_type: move.decisionType,
         was_successful: wonGame,
-        reward: wonGame ? (0.8 - (idx / gameHistory.length) * 0.3) : (-0.5 + (idx / gameHistory.length) * 0.3),
+        reward: wonGame ? (0.95 - (idx / gameHistory.length) * 0.2) : (-0.3 + (idx / gameHistory.length) * 0.2), // Higher rewards for winning moves
         aha_score_at_time: sessionAhaScore,
         strategy_snapshot: trainingData.length > 0 ? trainingData[0].strategy_weights : null
       }));
@@ -146,11 +146,11 @@ export default function AIBattle() {
         card_preference: ['low_cards', 'medium_cards', 'high_trumps', 'duplicates', 'singles', 'any_valid'][Math.floor(Math.random() * 6)],
         aggression_level: Math.random()
       },
-      success_rate: wonGame ? 0.55 : 0.45,
+      success_rate: wonGame ? 0.65 : 0.40, // Start winning tactics with higher success rate
       times_used: 1,
       times_won: wonGame ? 1 : 0,
       learned_from_game: gameId,
-      confidence: 0.2
+      confidence: wonGame ? 0.35 : 0.15 // Higher initial confidence for winning tactics
     });
     
     // Try to update existing or create new - STRICTLY NO DUPLICATES
@@ -162,7 +162,7 @@ export default function AIBattle() {
         const newTimesUsed = exactMatch.times_used + 1;
         const newTimesWon = exactMatch.times_won + (wonGame ? 1 : 0);
         const newSuccessRate = newTimesWon / newTimesUsed;
-        let confidenceChange = wonGame ? 0.12 : -0.08;
+        let confidenceChange = wonGame ? 0.18 : -0.05; // Boost confidence faster on wins
         const newConfidence = Math.max(0.01, Math.min(0.99, exactMatch.confidence + confidenceChange));
 
         try {
@@ -180,8 +180,8 @@ export default function AIBattle() {
         const allTactics = await base44.entities.AHATactic.list('', 1000);
         const isDuplicate = allTactics.some(t => t.tactic_name === newTactic.tactic_name);
         
-        if (!isDuplicate && allTactics.length < 200 && Math.random() > 0.7) {
-          // Create new experimental tactic (30% chance, max 200 tactics)
+        if (!isDuplicate && allTactics.length < 200 && (wonGame || Math.random() > 0.6)) {
+          // Create new experimental tactic (always create if won, 40% chance if lost, max 200 tactics)
           try {
             await base44.entities.AHATactic.create(newTactic);
             queryClient.invalidateQueries({ queryKey: ['ahaTactics'] });
@@ -559,11 +559,11 @@ export default function AIBattle() {
             }, ...prev.slice(0, 9)]);
           }
           
-          // Update AHA score based on performance
+          // Update AHA score with aggressive learning from wins
           const newScore = winner === 'aha' 
-            ? sessionAhaScore + 50
-            : Math.max(0, sessionAhaScore - 10);
-          
+            ? sessionAhaScore + 100 // Double reward for wins
+            : Math.max(0, sessionAhaScore - 5); // Less penalty for losses
+
           setSessionAhaScore(newScore);
 
           // Learn tactics AND gameplay skills from the game
@@ -642,24 +642,29 @@ export default function AIBattle() {
         return weekSessions[0]; // Last recorded session of the week
       });
     } else if (timeFilter === '1m' || timeFilter === '1w') {
-      // Group by day - last data point of each day
+      // Group by day - take average of all sessions per day for smoother data
       const grouped = {};
       filtered.forEach(s => {
-        const dateKey = new Date(s.session_date).toDateString();
+        const dateKey = new Date(s.session_date).toISOString().split('T')[0];
         if (!grouped[dateKey]) {
           grouped[dateKey] = [];
         }
         grouped[dateKey].push(s);
       });
-      
-      // Take last session of each day
-      return Object.keys(grouped).sort((a, b) => 
-        new Date(a).getTime() - new Date(b).getTime()
-      ).map(dateKey => {
-        const daySessions = grouped[dateKey].sort((a, b) => 
-          new Date(b.session_date).getTime() - new Date(a.session_date).getTime()
-        );
-        return daySessions[0]; // Last recorded session of the day
+
+      // Calculate daily averages
+      return Object.keys(grouped).sort().map(dateKey => {
+        const daySessions = grouped[dateKey];
+        const avgWinRate = daySessions.reduce((sum, s) => sum + s.win_rate, 0) / daySessions.length;
+        const totalGames = daySessions.reduce((sum, s) => sum + s.games_played, 0);
+        const totalWins = daySessions.reduce((sum, s) => sum + s.aha_wins, 0);
+        return {
+          session_date: daySessions[daySessions.length - 1].session_date,
+          win_rate: avgWinRate,
+          games_played: totalGames,
+          aha_wins: totalWins,
+          final_aha_score: daySessions[daySessions.length - 1].final_aha_score
+        };
       });
     }
     
