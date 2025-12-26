@@ -104,15 +104,18 @@ export class AIStrategyEngine {
     const { trumpSuit, tableCards, deckSize, opponentHandSize, ourHandSize } = gameState;
     const prob = new DurakProbabilityEngine(trumpSuit, deckSize, this.getVisibleCards(hand, tableCards));
     
-    // PRIORITY 1: APPLY LEARNED TACTICS (95% priority for high confidence tactics)
+    // PRIORITY 1: APPLY LEARNED TACTICS (only use good tactics)
     if (this.tactics && this.tactics.length > 0) {
       const tacticDecision = this.applyTactics(hand, gameState, action, trumpSuit);
       if (tacticDecision) {
-        // Use tactics more aggressively based on their quality
-        const highConfidenceTactics = this.tactics.filter(t => (t.confidence || 0) > 0.6 && (t.success_rate || 0) > 0.6);
-        const useRate = highConfidenceTactics.length > 3 ? 0.95 : 0.85;
-        if (Math.random() < useRate) {
-          return tacticDecision;
+        // Only use tactics with proven success
+        const goodTactics = this.tactics.filter(t => (t.confidence || 0) > 0.5 && (t.success_rate || 0) > 0.55);
+        if (goodTactics.length > 0) {
+          // Use rate based on average quality of good tactics
+          const avgQuality = goodTactics.reduce((sum, t) => sum + (t.confidence * t.success_rate), 0) / goodTactics.length;
+          if (Math.random() < avgQuality) {
+            return tacticDecision;
+          }
         }
       }
     }
@@ -425,8 +428,8 @@ export class AIStrategyEngine {
       t.scenario?.phase === action &&
       Math.abs((t.scenario.hand_size || 0) - ourHandSize) <= 3 &&
       Math.abs((t.scenario.deck_remaining || 0) - deckSize) <= 20 &&
-      (t.success_rate || 0) > 0.35 &&
-      (t.confidence || 0) > 0.2
+      (t.success_rate || 0) > 0.5 &&
+      (t.confidence || 0) > 0.4
     ).sort((a, b) => {
       // Heavily weight recent wins and confidence
       const scoreA = (a.success_rate || 0) * Math.pow((a.confidence || 0), 1.5) * Math.sqrt(a.times_won || 1);

@@ -170,19 +170,13 @@ export default function AIBattle() {
           const newConfidence = Math.max(0.01, Math.min(0.99, existingTactic.confidence + confidenceChange));
 
           try {
-            // Delete only completely failed tactics after many attempts
-            if (newTimesUsed >= 20 && newSuccessRate < 0.25 && newConfidence < 0.05) {
-              await base44.entities.AHATactic.delete(existingTactic.id);
-              await new Promise(resolve => setTimeout(resolve, 300));
-            } else {
-              await base44.entities.AHATactic.update(existingTactic.id, {
-                times_used: newTimesUsed,
-                times_won: newTimesWon,
-                success_rate: newSuccessRate,
-                confidence: newConfidence
-              });
-              await new Promise(resolve => setTimeout(resolve, 300));
-            }
+            await base44.entities.AHATactic.update(existingTactic.id, {
+              times_used: newTimesUsed,
+              times_won: newTimesWon,
+              success_rate: newSuccessRate,
+              confidence: newConfidence
+            });
+            await new Promise(resolve => setTimeout(resolve, 300));
             break; // Only update first similar tactic per new tactic
           } catch (error) {
             console.error('Tactic update failed:', error);
