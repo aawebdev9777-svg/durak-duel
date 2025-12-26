@@ -15,10 +15,18 @@ export function createDeck() {
 
 export function shuffleDeck(deck) {
   const shuffled = [...deck];
-  for (let i = shuffled.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+  
+  // Multiple shuffle passes for better randomization
+  for (let pass = 0; pass < 3; pass++) {
+    for (let i = shuffled.length - 1; i > 0; i--) {
+      // Use crypto.getRandomValues for better randomness
+      const randomBuffer = new Uint32Array(1);
+      crypto.getRandomValues(randomBuffer);
+      const j = Math.floor((randomBuffer[0] / (0xFFFFFFFF + 1)) * (i + 1));
+      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    }
   }
+  
   return shuffled;
 }
 

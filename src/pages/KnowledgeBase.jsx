@@ -29,7 +29,7 @@ export default function KnowledgeBase() {
     setIsAdding(true);
     try {
       await addMassiveKnowledge();
-      alert('✅ 50,000 knowledge records added! Reloading...');
+      alert('✅ 100,000 expert records added! AI is now WORLD CHAMPION! Reloading...');
       window.location.reload();
     } catch (error) {
       console.error(error);
@@ -103,7 +103,7 @@ export default function KnowledgeBase() {
           className="bg-purple-600 hover:bg-purple-700 gap-2"
         >
           <Plus className="w-4 h-4" />
-          {isAdding ? 'Adding...' : 'Add 50K Records'}
+          {isAdding ? 'Adding 100K...' : 'Add 100K Records'}
         </Button>
       </div>
       

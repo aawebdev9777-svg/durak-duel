@@ -224,10 +224,19 @@ export default function Game() {
       const aiDifficulty = difficulty;
       
       if (state.phase === 'attack') {
-        // AI attacking
+        // AI attacking with trained knowledge
         if (state.tableCards.length === 0) {
-          // Initial attack
-          const attackCard = aiSelectAttack(state.hands[aiPlayer], [], state.trumpSuit, aiDifficulty, trainedWeights, learnedKnowledge);
+          // Initial attack - use learned strategies
+          const attackCard = aiSelectAttack(
+            state.hands[aiPlayer], 
+            [], 
+            state.trumpSuit, 
+            aiDifficulty, 
+            trainedWeights, 
+            learnedKnowledge,
+            state.deck.length,
+            state.hands[state.defender].length
+          );
           if (attackCard) {
             const newHands = [...state.hands];
             newHands[aiPlayer] = newHands[aiPlayer].filter(c => c.id !== attackCard.id);
@@ -240,7 +249,7 @@ export default function Game() {
             setGameMessage('Defend against the attack!');
           }
         } else {
-          // Continue attack or end
+          // Continue attack or end - using learned patterns
           const shouldContinue = aiShouldContinueAttack(
             state.hands[aiPlayer],
             state.tableCards,
@@ -252,7 +261,16 @@ export default function Game() {
           );
           
           if (shouldContinue) {
-            const attackCard = aiSelectAttack(state.hands[aiPlayer], state.tableCards, state.trumpSuit, aiDifficulty, trainedWeights, learnedKnowledge);
+            const attackCard = aiSelectAttack(
+              state.hands[aiPlayer], 
+              state.tableCards, 
+              state.trumpSuit, 
+              aiDifficulty, 
+              trainedWeights, 
+              learnedKnowledge,
+              state.deck.length,
+              state.hands[state.defender].length
+            );
             if (attackCard) {
               const newHands = [...state.hands];
               newHands[aiPlayer] = newHands[aiPlayer].filter(c => c.id !== attackCard.id);
@@ -271,7 +289,7 @@ export default function Game() {
           }
         }
       } else {
-        // AI defending
+        // AI defending with expert knowledge
         const undefended = state.tableCards.find(p => !p.defense);
         if (undefended) {
           const defenseCard = aiSelectDefense(
@@ -280,7 +298,9 @@ export default function Game() {
             state.trumpSuit,
             aiDifficulty,
             trainedWeights,
-            learnedKnowledge
+            learnedKnowledge,
+            state.deck.length,
+            state.hands[state.attacker].length
           );
           
           if (defenseCard) {

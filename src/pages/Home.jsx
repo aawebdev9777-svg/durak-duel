@@ -23,7 +23,14 @@ const suitSymbols = ['♠', '♥', '♦', '♣'];
 export default function Home() {
   const [numPlayers, setNumPlayers] = useState(1);
   const [difficulty, setDifficulty] = useState('medium');
-  const [ahaScore] = useState(25000); // World-class AHA AI
+  // Load actual AHA score from database
+  const { data: trainingData = [] } = useQuery({
+    queryKey: ['aiTraining'],
+    queryFn: () => base44.entities.AITrainingData.list(),
+    initialData: []
+  });
+  
+  const ahaScore = trainingData.length > 0 ? trainingData[0].aha_score : 25000;
   
   const difficulties = [
     { id: 'easy', label: 'Easy', description: 'For beginners' },
