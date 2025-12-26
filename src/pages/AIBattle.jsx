@@ -46,6 +46,7 @@ export default function AIBattle() {
   const autoSessionMinutes = 2; // Fixed 2-minute auto sessions
   const [sessionStartTime, setSessionStartTime] = useState(null);
   const [countdown, setCountdown] = useState(0);
+  const [isGraphFullscreen, setIsGraphFullscreen] = useState(false);
   
   const gameRef = useRef(null);
   const isRunningRef = useRef(false);
@@ -529,7 +530,7 @@ export default function AIBattle() {
   const displayTotalGames = (trainingData.length > 0 ? trainingData[0].games_played : 0) + (isRunning ? stats.totalGames : 0);
   const winRate = stats.totalGames > 0 ? ((stats.ahaWins / stats.totalGames) * 100).toFixed(1) : 0;
   
-  // Filter and condense sessions by time period
+  // Filter and condense sessions by time period - last data point per day/week
   const getFilteredSessions = () => {
     const now = new Date();
     let filtered = sessions;
@@ -553,42 +554,49 @@ export default function AIBattle() {
       filtered = sessions.filter(s => new Date(s.session_date) >= filterDate);
     }
     
-    // Condense data for longer time periods
-    if (timeFilter === '1y' && filtered.length > 50) {
-      // Group by week for year view
+    // Condense data - last recorded data point per time unit
+    if (timeFilter === '1y') {
+      // Group by week - last data point of each week (52 data points)
       const grouped = {};
       filtered.forEach(s => {
         const date = new Date(s.session_date);
-        const weekKey = `${date.getFullYear()}-W${Math.floor(date.getDate() / 7)}`;
+        const weekStart = new Date(date);
+        weekStart.setDate(date.getDate() - date.getDay()); // Start of week
+        const weekKey = weekStart.toISOString().split('T')[0];
+        
         if (!grouped[weekKey]) {
-          grouped[weekKey] = { sessions: [], date: date };
+          grouped[weekKey] = [];
         }
-        grouped[weekKey].sessions.push(s);
+        grouped[weekKey].push(s);
       });
       
-      return Object.values(grouped).map(group => ({
-        session_date: group.date.toISOString(),
-        win_rate: group.sessions.reduce((sum, s) => sum + s.win_rate, 0) / group.sessions.length,
-        games_played: group.sessions.reduce((sum, s) => sum + s.games_played, 0),
-        aha_wins: group.sessions.reduce((sum, s) => sum + s.aha_wins, 0)
-      }));
-    } else if (timeFilter === '1m' && filtered.length > 30) {
-      // Group by day for month view
+      // Take last session of each week
+      return Object.keys(grouped).sort().map(weekKey => {
+        const weekSessions = grouped[weekKey].sort((a, b) => 
+          new Date(b.session_date).getTime() - new Date(a.session_date).getTime()
+        );
+        return weekSessions[0]; // Last recorded session of the week
+      });
+    } else if (timeFilter === '1m' || timeFilter === '1w') {
+      // Group by day - last data point of each day
       const grouped = {};
       filtered.forEach(s => {
         const dateKey = new Date(s.session_date).toDateString();
         if (!grouped[dateKey]) {
-          grouped[dateKey] = { sessions: [], date: new Date(s.session_date) };
+          grouped[dateKey] = [];
         }
-        grouped[dateKey].sessions.push(s);
+        grouped[dateKey].push(s);
       });
       
-      return Object.values(grouped).map(group => ({
-        session_date: group.date.toISOString(),
-        win_rate: group.sessions.reduce((sum, s) => sum + s.win_rate, 0) / group.sessions.length,
-        games_played: group.sessions.reduce((sum, s) => sum + s.games_played, 0),
-        aha_wins: group.sessions.reduce((sum, s) => sum + s.aha_wins, 0)
-      }));
+      // Take last session of each day
+      return Object.keys(grouped).sort((a, b) => 
+        new Date(a).getTime() - new Date(b).getTime()
+      ).map(dateKey => {
+        const daySessions = grouped[dateKey].sort((a, b) => 
+          new Date(b.session_date).getTime() - new Date(a.session_date).getTime()
+        );
+        return daySessions[0]; // Last recorded session of the day
+      });
     }
     
     return filtered;
@@ -597,6 +605,85 @@ export default function AIBattle() {
   const filteredSessions = getFilteredSessions();
   
   return (
+    <>
+    {isGraphFullscreen && (
+      <div className="fixed inset-0 bg-slate-900 z-50 p-6 flex flex-col">
+        <div className="flex justify-between items-center mb-4">
+          <h2 className="text-2xl font-bold text-white flex items-center gap-2">
+            <Activity className="w-6 h-6 text-cyan-400" />
+            Win Rate Progress
+          </h2>
+          <Button onClick={() => setIsGraphFullscreen(false)} variant="ghost" className="text-white">
+            Close
+          </Button>
+        </div>
+        <div className="flex gap-2 mb-4 justify-center">
+          {[
+            { label: '1D', value: '1d' },
+            { label: '1W', value: '1w' },
+            { label: '1M', value: '1m' },
+            { label: '1Y', value: '1y' },
+            { label: 'All', value: 'all' }
+          ].map(filter => (
+            <button
+              key={filter.value}
+              onClick={() => setTimeFilter(filter.value)}
+              className={`px-3 py-1 rounded text-xs transition-all ${
+                timeFilter === filter.value
+                  ? 'bg-cyan-600 text-white'
+                  : 'bg-slate-700 text-slate-400 hover:bg-slate-600'
+              }`}
+            >
+              {filter.label}
+            </button>
+          ))}
+        </div>
+        <div className="flex-1">
+          <ResponsiveContainer width="100%" height="100%">
+            <LineChart data={[...filteredSessions].reverse()}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
+              <XAxis 
+                dataKey="session_date" 
+                stroke="#94a3b8"
+                tick={{ fill: '#94a3b8', fontSize: 12 }}
+                tickFormatter={(value) => new Date(value).toLocaleDateString()}
+              />
+              <YAxis 
+                stroke="#94a3b8"
+                tick={{ fill: '#94a3b8', fontSize: 12 }}
+                domain={[0, 100]}
+                label={{ value: 'Win Rate %', angle: -90, position: 'insideLeft', fill: '#94a3b8' }}
+              />
+              <Tooltip 
+                contentStyle={{ 
+                  backgroundColor: '#1e293b', 
+                  border: '1px solid #475569',
+                  borderRadius: '8px',
+                  color: '#fff'
+                }}
+                formatter={(value) => [`${value.toFixed(1)}%`, 'Win Rate']}
+                labelFormatter={(label) => new Date(label).toLocaleString()}
+              />
+              <ReferenceLine 
+                y={75} 
+                stroke="#10b981" 
+                strokeDasharray="5 5" 
+                strokeWidth={2}
+                label={{ value: 'Target: 75%', position: 'right', fill: '#10b981', fontSize: 12 }}
+              />
+              <Line 
+                type="linear" 
+                dataKey="win_rate" 
+                stroke="#06b6d4" 
+                strokeWidth={3}
+                dot={{ fill: '#06b6d4', r: 4 }}
+                activeDot={{ r: 6 }}
+              />
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
+    )}
     <div className="min-h-screen bg-gradient-to-b from-slate-900 via-purple-950 to-slate-900 p-4">
       <div className="flex justify-between items-center mb-6 max-w-6xl mx-auto">
         <Link to={createPageUrl('Home')}>
@@ -650,7 +737,15 @@ export default function AIBattle() {
                 <Activity className="w-5 h-5 text-cyan-400" />
                 Win Rate Progress
               </div>
-              <div className="flex gap-2">
+              <div className="flex gap-2 items-center">
+                <Button 
+                  size="sm" 
+                  variant="ghost" 
+                  onClick={() => setIsGraphFullscreen(true)}
+                  className="text-cyan-400 hover:text-cyan-300 text-xs"
+                >
+                  Fullscreen
+                </Button>
                 {[
                   { label: '1D', value: '1d' },
                   { label: '1W', value: '1w' },
@@ -1027,5 +1122,6 @@ export default function AIBattle() {
         </div>
       </div>
     </div>
+    </>
   );
 }
