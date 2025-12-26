@@ -12,7 +12,8 @@ import {
   ChevronRight,
   Crown,
   Sparkles,
-  Database
+  Database,
+  Zap
 } from 'lucide-react';
 
 import { useQuery } from '@tanstack/react-query';
@@ -264,12 +265,20 @@ export default function Home() {
                   </>
                 )}
 
-                <Link to={createPageUrl('KnowledgeBase')} className="block">
-                  <Button className="w-full bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white h-12 text-lg gap-2 border border-blue-500/50">
-                    <Database className="w-5 h-5" />
-                    View AI Knowledge
-                  </Button>
-                </Link>
+                <div className="grid grid-cols-2 gap-2">
+                  <Link to={createPageUrl('KnowledgeBase')} className="block">
+                    <Button className="w-full bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white gap-2 border border-blue-500/50">
+                      <Database className="w-4 h-4" />
+                      Knowledge
+                    </Button>
+                  </Link>
+                  <Link to={createPageUrl('AIBattle')} className="block">
+                    <Button className="w-full bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 text-white gap-2 border border-purple-500/50">
+                      <Zap className="w-4 h-4" />
+                      AI Battle
+                    </Button>
+                  </Link>
+                </div>
               </CardContent>
             </Card>
           </motion.div>

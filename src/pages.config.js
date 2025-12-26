@@ -2,6 +2,7 @@ import Game from './pages/Game';
 import Home from './pages/Home';
 import KnowledgeBase from './pages/KnowledgeBase';
 import Training from './pages/Training';
+import AIBattle from './pages/AIBattle';
 
 
 export const PAGES = {
@@ -9,6 +10,7 @@ export const PAGES = {
     "Home": Home,
     "KnowledgeBase": KnowledgeBase,
     "Training": Training,
+    "AIBattle": AIBattle,
 }
 
 export const pagesConfig = {
