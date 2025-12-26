@@ -628,7 +628,13 @@ export default function Training() {
     
     setTimeout(() => {
       clearInterval(analysisInterval);
-      
+
+      // Save any remaining batched knowledge
+      if (knowledgeBatchRef.current.length > 0) {
+        base44.entities.AIKnowledge.bulkCreate([...knowledgeBatchRef.current]).catch(() => {});
+        knowledgeBatchRef.current = [];
+      }
+
       // Create knowledge batch when manually saving
       const knowledgeBatch = [];
       const recordCount = 500;
