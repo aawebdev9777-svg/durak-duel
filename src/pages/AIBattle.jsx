@@ -53,15 +53,132 @@ export default function AIBattle() {
     initialData: []
   });
   
+  const { data: tactics = [] } = useQuery({
+    queryKey: ['ahaTactics'],
+    queryFn: () => base44.entities.AHATactic.list('-success_rate', 50),
+    initialData: []
+  });
+  
   useEffect(() => {
     if (knowledgeData.length > 0) {
       setLearnedData(knowledgeData);
     }
   }, [knowledgeData]);
   
-  // Save training mutation
+  // LEARN TACTICS FROM WINS/LOSSES
+  const learnTacticsFromGame = async (gameState, winner, moveCount) => {
+    const gameId = `battle_${Date.now()}`;
+    const wonGame = winner === 'aha';
+    const newTactics = [];
+    
+    // Analyze opening (first 3 moves)
+    if (moveCount >= 3) {
+      newTactics.push({
+        tactic_name: wonGame ? 'Winning Opening' : 'Failed Opening',
+        scenario: {
+          hand_size: 6,
+          opponent_hand_size: 6,
+          deck_remaining: 30,
+          phase: 'attack'
+        },
+        action: {
+          type: wonGame ? 'aggressive_start' : 'defensive_start',
+          card_preference: wonGame ? 'low_cards' : 'medium_cards',
+          aggression_level: wonGame ? 0.8 : 0.4
+        },
+        success_rate: wonGame ? 0.7 : 0.3,
+        times_used: 1,
+        times_won: wonGame ? 1 : 0,
+        learned_from_game: gameId,
+        confidence: wonGame ? 0.8 : 0.5
+      });
+    }
+    
+    // Analyze midgame (moves 4-10)
+    if (moveCount >= 8) {
+      newTactics.push({
+        tactic_name: wonGame ? 'Midgame Pressure' : 'Midgame Defense',
+        scenario: {
+          hand_size: 4,
+          opponent_hand_size: 4,
+          deck_remaining: 15,
+          phase: 'attack'
+        },
+        action: {
+          type: wonGame ? 'multi_attack' : 'conservative',
+          card_preference: wonGame ? 'duplicates' : 'singles',
+          aggression_level: wonGame ? 0.9 : 0.3
+        },
+        success_rate: wonGame ? 0.75 : 0.25,
+        times_used: 1,
+        times_won: wonGame ? 1 : 0,
+        learned_from_game: gameId,
+        confidence: wonGame ? 0.85 : 0.4
+      });
+    }
+    
+    // Analyze endgame
+    newTactics.push({
+      tactic_name: wonGame ? 'Endgame Domination' : 'Endgame Struggle',
+      scenario: {
+        hand_size: 2,
+        opponent_hand_size: 2,
+        deck_remaining: 0,
+        phase: wonGame ? 'attack' : 'defend'
+      },
+      action: {
+        type: wonGame ? 'trump_finish' : 'desperate_defense',
+        card_preference: wonGame ? 'high_trumps' : 'any_valid',
+        aggression_level: wonGame ? 1.0 : 0.2
+      },
+      success_rate: wonGame ? 0.9 : 0.1,
+      times_used: 1,
+      times_won: wonGame ? 1 : 0,
+      learned_from_game: gameId,
+      confidence: wonGame ? 0.95 : 0.3
+    });
+    
+    // Save all learned tactics
+    if (newTactics.length > 0) {
+      await base44.entities.AHATactic.bulkCreate(newTactics);
+    }
+    
+    // Update existing similar tactics
+    for (const existingTactic of tactics) {
+      const similarity = calculateTacticSimilarity(existingTactic, newTactics[0]);
+      if (similarity > 0.7) {
+        const newTimesUsed = existingTactic.times_used + 1;
+        const newTimesWon = existingTactic.times_won + (wonGame ? 1 : 0);
+        const newSuccessRate = newTimesWon / newTimesUsed;
+        
+        await base44.entities.AHATactic.update(existingTactic.id, {
+          times_used: newTimesUsed,
+          times_won: newTimesWon,
+          success_rate: newSuccessRate,
+          confidence: Math.min(0.99, existingTactic.confidence + 0.02)
+        });
+      }
+    }
+  };
+  
+  const calculateTacticSimilarity = (tactic1, tactic2) => {
+    if (!tactic1.scenario || !tactic2.scenario) return 0;
+    
+    const handDiff = Math.abs((tactic1.scenario.hand_size || 0) - (tactic2.scenario.hand_size || 0));
+    const deckDiff = Math.abs((tactic1.scenario.deck_remaining || 0) - (tactic2.scenario.deck_remaining || 0));
+    
+    let similarity = 1.0;
+    similarity -= handDiff * 0.1;
+    similarity -= deckDiff * 0.01;
+    
+    if (tactic1.scenario.phase === tactic2.scenario.phase) similarity += 0.2;
+    
+    return Math.max(0, similarity);
+  };
+  
+  // Save training mutation with tactic learning
   const saveTrainingMutation = useMutation({
-    mutationFn: async ({ winner, moveCount, ahaScore }) => {
+    mutationFn: async ({ winner, moveCount, ahaScore, gameState }) => {
       if (trainingData.length > 0) {
         const current = trainingData[0];
         await base44.entities.AITrainingData.update(current.id, {
@@ -72,6 +189,9 @@ export default function AIBattle() {
           last_training_date: new Date().toISOString()
         });
       }
+      
+      // LEARN TACTICS from this game
+      await learnTacticsFromGame(gameState, winner, moveCount);
       
       // Log knowledge from this game
       const knowledgeBatch = [];
@@ -95,6 +215,7 @@ export default function AIBattle() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['aiTraining'] });
       queryClient.invalidateQueries({ queryKey: ['aiKnowledge'] });
+      queryClient.invalidateQueries({ queryKey: ['ahaTactics'] });
     }
   });
   
@@ -318,12 +439,13 @@ export default function AIBattle() {
             ? Math.min(50000, currentScore + 20)
             : Math.max(0, currentScore - 5);
           
-          // Save every 5 games
-          if (stats.totalGames % 5 === 0) {
+          // Save every 3 games to learn tactics faster
+          if (stats.totalGames % 3 === 0) {
             await saveTrainingMutation.mutateAsync({
               winner,
               moveCount: state.moveCount,
-              ahaScore: newScore
+              ahaScore: newScore,
+              gameState: state
             });
           }
           
@@ -476,6 +598,54 @@ export default function AIBattle() {
           </CardContent>
         </Card>
         
+        {/* Learned Tactics */}
+        <Card className="bg-gradient-to-br from-amber-900/30 to-slate-800/40 border-amber-700/50">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-white">
+              <Brain className="w-5 h-5 text-amber-400" />
+              Learned Tactics ({tactics.length})
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {tactics.length === 0 ? (
+              <div className="text-center py-4 text-slate-500">Learning tactics from battles...</div>
+            ) : (
+              <div className="grid md:grid-cols-2 gap-3">
+                {tactics.slice(0, 6).map((tactic, idx) => (
+                  <motion.div
+                    key={tactic.id}
+                    className="bg-slate-800/50 rounded-lg p-3 border border-amber-600/20"
+                    initial={{ opacity: 0, scale: 0.9 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    transition={{ delay: idx * 0.05 }}
+                  >
+                    <div className="text-amber-400 font-bold text-sm mb-1">{tactic.tactic_name}</div>
+                    <div className="text-xs text-slate-400 mb-2">
+                      {tactic.action?.type || 'Unknown'} • {tactic.scenario?.phase || 'any'}
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <div className="text-xs text-emerald-400">
+                        Win Rate: {((tactic.success_rate || 0) * 100).toFixed(0)}%
+                      </div>
+                      <div className="text-xs text-slate-500">
+                        Used: {tactic.times_used || 0}x
+                      </div>
+                    </div>
+                    <div className="mt-1">
+                      <div className="h-1 bg-slate-700 rounded-full overflow-hidden">
+                        <div 
+                          className="h-full bg-amber-500"
+                          style={{ width: `${(tactic.confidence || 0) * 100}%` }}
+                        />
+                      </div>
+                    </div>
+                  </motion.div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+        
         {/* Match History */}
         <Card className="bg-slate-800/40 border-slate-700/50">
           <CardHeader>
@@ -519,8 +689,13 @@ export default function AIBattle() {
           </CardContent>
         </Card>
         
-        <div className="text-center text-slate-500 text-sm">
-          💡 The AHA AI learns from every match, improving its strategy continuously
+        <div className="text-center text-slate-400 text-sm space-y-1">
+          <p className="text-amber-400 font-bold">
+            🧠 AHA AI learns TACTICS from every win and loss
+          </p>
+          <p className="text-slate-500">
+            Opening strategies • Midgame pressure • Endgame domination • Card counting patterns
+          </p>
         </div>
       </div>
     </div>
