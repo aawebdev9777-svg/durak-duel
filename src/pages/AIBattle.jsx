@@ -43,7 +43,7 @@ export default function AIBattle() {
   const [matchHistory, setMatchHistory] = useState([]);
   const [sessionAhaScore, setSessionAhaScore] = useState(0);
   const [timeFilter, setTimeFilter] = useState('all');
-  const [autoSessionMinutes, setAutoSessionMinutes] = useState(2);
+  const autoSessionMinutes = 2; // Fixed 2-minute auto sessions
   const [sessionStartTime, setSessionStartTime] = useState(null);
   
   const gameRef = useRef(null);
@@ -772,19 +772,8 @@ export default function AIBattle() {
             <CardTitle className="flex items-center justify-between text-white">
               <span>Live Battle Status</span>
               <div className="flex items-center gap-4">
-                <div className="flex items-center gap-2">
-                  <span className="text-sm text-slate-400">Auto-Session:</span>
-                  <select
-                    value={autoSessionMinutes}
-                    onChange={(e) => setAutoSessionMinutes(parseInt(e.target.value))}
-                    className="bg-slate-700 text-white px-2 py-1 rounded text-sm"
-                    disabled={isRunning}
-                  >
-                    <option value={1}>1 min</option>
-                    <option value={2}>2 min</option>
-                    <option value={3}>3 min</option>
-                    <option value={5}>5 min</option>
-                  </select>
+                <div className="text-sm text-emerald-400">
+                  🔄 Auto-session every 2 minutes
                 </div>
                 <div className="flex items-center gap-2">
                   <span className="text-sm text-slate-400">Speed:</span>
