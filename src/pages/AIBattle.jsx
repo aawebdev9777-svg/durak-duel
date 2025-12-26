@@ -142,22 +142,11 @@ export default function AIBattle() {
       confidence: 0.3 // Start low
     });
     
-    // Save only 1 tactic per game to reduce API calls
-    if (newTactics.length > 0) {
-      const bestTactic = newTactics.sort((a, b) => b.confidence - a.confidence)[0];
-      try {
-        await base44.entities.AHATactic.create(bestTactic);
-        await new Promise(resolve => setTimeout(resolve, 300));
-      } catch (error) {
-        console.error('Tactic save failed:', error);
-      }
-    }
-    
-    // Update ALL similar tactics to strengthen learning (limit to top 5)
+    // Check for similar tactics FIRST, only create if none exist
     for (const newTactic of newTactics) {
       let foundSimilar = false;
 
-      for (const existingTactic of tactics.slice(0, 5)) {
+      for (const existingTactic of tactics) {
         const similarity = calculateTacticSimilarity(existingTactic, newTactic);
         if (similarity > 0.65) {
           foundSimilar = true;
@@ -177,10 +166,21 @@ export default function AIBattle() {
               confidence: newConfidence
             });
             await new Promise(resolve => setTimeout(resolve, 300));
-            break; // Only update first similar tactic per new tactic
+            break; // Only update first similar tactic
           } catch (error) {
             console.error('Tactic update failed:', error);
           }
+        }
+      }
+
+      // Only create new tactic if no similar one was found
+      if (!foundSimilar && tactics.length < 50) {
+        try {
+          await base44.entities.AHATactic.create(newTactic);
+          await new Promise(resolve => setTimeout(resolve, 300));
+          break; // Only create 1 new tactic per game
+        } catch (error) {
+          console.error('Tactic save failed:', error);
         }
       }
     }
