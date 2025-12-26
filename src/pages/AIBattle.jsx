@@ -43,6 +43,8 @@ export default function AIBattle() {
   const [matchHistory, setMatchHistory] = useState([]);
   const [sessionAhaScore, setSessionAhaScore] = useState(0);
   const [timeFilter, setTimeFilter] = useState('all');
+  const [autoSessionMinutes, setAutoSessionMinutes] = useState(2);
+  const [sessionStartTime, setSessionStartTime] = useState(null);
   
   const gameRef = useRef(null);
   const isRunningRef = useRef(false);
@@ -86,90 +88,51 @@ export default function AIBattle() {
     }
   }, [trainingData]);
   
-  // LEARN TACTICS FROM WINS/LOSSES
+  // LEARN TACTICS FROM WINS/LOSSES - NOW CREATES NEW TACTICS!
   const learnTacticsFromGame = async (gameState, winner, moveCount) => {
     const gameId = `battle_${Date.now()}`;
     const wonGame = winner === 'aha';
+    
+    // Generate experimental tactic names
+    const tacticTypes = ['Opening', 'Midgame', 'Endgame', 'Trump Control', 'Card Conservation', 'Aggressive Push', 'Defensive Hold'];
+    const tacticVariations = ['Alpha', 'Beta', 'Gamma', 'Delta', 'Epsilon', 'Zeta', 'Eta', 'Theta'];
+    
+    const randomType = tacticTypes[Math.floor(Math.random() * tacticTypes.length)];
+    const randomVar = tacticVariations[Math.floor(Math.random() * tacticVariations.length)];
+    const experimentalName = `${randomType} ${randomVar}`;
+    
     const newTactics = [];
     
-    // Analyze opening (first 3 moves)
-    if (moveCount >= 3) {
-      newTactics.push({
-        tactic_name: wonGame ? 'Winning Opening' : 'Failed Opening',
-        scenario: {
-          hand_size: 6,
-          opponent_hand_size: 6,
-          deck_remaining: 30,
-          phase: 'attack'
-        },
-        action: {
-          type: wonGame ? 'aggressive_start' : 'defensive_start',
-          card_preference: wonGame ? 'low_cards' : 'medium_cards',
-          aggression_level: wonGame ? 0.8 : 0.4
-        },
-        success_rate: wonGame ? 0.6 : 0.4,
-        times_used: 1,
-        times_won: wonGame ? 1 : 0,
-        learned_from_game: gameId,
-        confidence: 0.3 // Start low, will increase with wins
-      });
-    }
-
-    // Analyze midgame (moves 4-10)
-    if (moveCount >= 8) {
-      newTactics.push({
-        tactic_name: wonGame ? 'Midgame Pressure' : 'Midgame Defense',
-        scenario: {
-          hand_size: 4,
-          opponent_hand_size: 4,
-          deck_remaining: 15,
-          phase: 'attack'
-        },
-        action: {
-          type: wonGame ? 'multi_attack' : 'conservative',
-          card_preference: wonGame ? 'duplicates' : 'singles',
-          aggression_level: wonGame ? 0.9 : 0.3
-        },
-        success_rate: wonGame ? 0.6 : 0.4,
-        times_used: 1,
-        times_won: wonGame ? 1 : 0,
-        learned_from_game: gameId,
-        confidence: 0.3 // Start low
-      });
-    }
-
-    // Analyze endgame
+    // Create experimental tactic based on game state
     newTactics.push({
-      tactic_name: wonGame ? 'Endgame Domination' : 'Endgame Struggle',
+      tactic_name: experimentalName,
       scenario: {
-        hand_size: 2,
-        opponent_hand_size: 2,
-        deck_remaining: 0,
-        phase: wonGame ? 'attack' : 'defend'
+        hand_size: Math.floor(Math.random() * 6) + 1,
+        opponent_hand_size: Math.floor(Math.random() * 6) + 1,
+        deck_remaining: Math.floor(Math.random() * 36),
+        phase: Math.random() > 0.5 ? 'attack' : 'defend'
       },
       action: {
-        type: wonGame ? 'trump_finish' : 'desperate_defense',
-        card_preference: wonGame ? 'high_trumps' : 'any_valid',
-        aggression_level: wonGame ? 1.0 : 0.2
+        type: ['aggressive_start', 'conservative', 'multi_attack', 'trump_finish', 'desperate_defense'][Math.floor(Math.random() * 5)],
+        card_preference: ['low_cards', 'medium_cards', 'high_trumps', 'duplicates', 'singles', 'any_valid'][Math.floor(Math.random() * 6)],
+        aggression_level: Math.random()
       },
-      success_rate: wonGame ? 0.6 : 0.4,
+      success_rate: wonGame ? 0.55 : 0.45,
       times_used: 1,
       times_won: wonGame ? 1 : 0,
       learned_from_game: gameId,
-      confidence: 0.3 // Start low
+      confidence: 0.2
     });
     
-    // ONLY UPDATE EXISTING TACTICS - don't create new ones
+    // Try to update existing or create new
     for (const newTactic of newTactics) {
-      // Find exact match first by name
       const exactMatch = tactics.find(t => t.tactic_name === newTactic.tactic_name);
       
       if (exactMatch) {
+        // Update existing
         const newTimesUsed = exactMatch.times_used + 1;
         const newTimesWon = exactMatch.times_won + (wonGame ? 1 : 0);
         const newSuccessRate = newTimesWon / newTimesUsed;
-
-        // Confidence rises and falls naturally
         let confidenceChange = wonGame ? 0.12 : -0.08;
         const newConfidence = Math.max(0.01, Math.min(0.99, exactMatch.confidence + confidenceChange));
 
@@ -180,9 +143,16 @@ export default function AIBattle() {
             success_rate: newSuccessRate,
             confidence: newConfidence
           });
-          break; // Only update once per game
         } catch (error) {
           console.error('Tactic update failed:', error);
+        }
+      } else if (tactics.length < 200 && Math.random() > 0.7) {
+        // Create new experimental tactic (30% chance, max 200 tactics)
+        try {
+          await base44.entities.AHATactic.create(newTactic);
+          queryClient.invalidateQueries({ queryKey: ['ahaTactics'] });
+        } catch (error) {
+          console.error('Tactic creation failed:', error);
         }
       }
     }
@@ -433,6 +403,33 @@ export default function AIBattle() {
     return null;
   };
   
+  // Auto-restart sessions
+  useEffect(() => {
+    if (!isRunning || !sessionStartTime) return;
+    
+    const checkInterval = setInterval(() => {
+      const elapsed = Date.now() - sessionStartTime;
+      const targetMs = autoSessionMinutes * 60 * 1000;
+      
+      if (elapsed >= targetMs && stats.totalGames > 0) {
+        // Auto-save and restart session
+        const sessionWinRate = ((stats.ahaWins / stats.totalGames) * 100);
+        saveTrainingMutation.mutate({
+          sessionGames: stats.totalGames,
+          sessionWins: stats.ahaWins,
+          ahaScore: sessionAhaScore,
+          winRate: sessionWinRate
+        });
+        
+        // Reset session stats
+        setStats({ ahaWins: 0, opponentWins: 0, totalGames: 0 });
+        setSessionStartTime(Date.now());
+      }
+    }, 5000); // Check every 5 seconds
+    
+    return () => clearInterval(checkInterval);
+  }, [isRunning, sessionStartTime, stats, sessionAhaScore, autoSessionMinutes]);
+  
   useEffect(() => {
     isRunningRef.current = isRunning;
     
@@ -500,30 +497,69 @@ export default function AIBattle() {
   const displayTotalGames = (trainingData.length > 0 ? trainingData[0].games_played : 0) + (isRunning ? stats.totalGames : 0);
   const winRate = stats.totalGames > 0 ? ((stats.ahaWins / stats.totalGames) * 100).toFixed(1) : 0;
   
-  // Filter sessions by time period
+  // Filter and condense sessions by time period
   const getFilteredSessions = () => {
     const now = new Date();
-    if (timeFilter === 'all') return sessions;
+    let filtered = sessions;
     
-    const filterDate = new Date();
-    switch(timeFilter) {
-      case '1d':
-        filterDate.setDate(now.getDate() - 1);
-        break;
-      case '1w':
-        filterDate.setDate(now.getDate() - 7);
-        break;
-      case '1m':
-        filterDate.setMonth(now.getMonth() - 1);
-        break;
-      case '1y':
-        filterDate.setFullYear(now.getFullYear() - 1);
-        break;
-      default:
-        return sessions;
+    if (timeFilter !== 'all') {
+      const filterDate = new Date();
+      switch(timeFilter) {
+        case '1d':
+          filterDate.setDate(now.getDate() - 1);
+          break;
+        case '1w':
+          filterDate.setDate(now.getDate() - 7);
+          break;
+        case '1m':
+          filterDate.setMonth(now.getMonth() - 1);
+          break;
+        case '1y':
+          filterDate.setFullYear(now.getFullYear() - 1);
+          break;
+      }
+      filtered = sessions.filter(s => new Date(s.session_date) >= filterDate);
     }
     
-    return sessions.filter(s => new Date(s.session_date) >= filterDate);
+    // Condense data for longer time periods
+    if (timeFilter === '1y' && filtered.length > 50) {
+      // Group by week for year view
+      const grouped = {};
+      filtered.forEach(s => {
+        const date = new Date(s.session_date);
+        const weekKey = `${date.getFullYear()}-W${Math.floor(date.getDate() / 7)}`;
+        if (!grouped[weekKey]) {
+          grouped[weekKey] = { sessions: [], date: date };
+        }
+        grouped[weekKey].sessions.push(s);
+      });
+      
+      return Object.values(grouped).map(group => ({
+        session_date: group.date.toISOString(),
+        win_rate: group.sessions.reduce((sum, s) => sum + s.win_rate, 0) / group.sessions.length,
+        games_played: group.sessions.reduce((sum, s) => sum + s.games_played, 0),
+        aha_wins: group.sessions.reduce((sum, s) => sum + s.aha_wins, 0)
+      }));
+    } else if (timeFilter === '1m' && filtered.length > 30) {
+      // Group by day for month view
+      const grouped = {};
+      filtered.forEach(s => {
+        const dateKey = new Date(s.session_date).toDateString();
+        if (!grouped[dateKey]) {
+          grouped[dateKey] = { sessions: [], date: new Date(s.session_date) };
+        }
+        grouped[dateKey].sessions.push(s);
+      });
+      
+      return Object.values(grouped).map(group => ({
+        session_date: group.date.toISOString(),
+        win_rate: group.sessions.reduce((sum, s) => sum + s.win_rate, 0) / group.sessions.length,
+        games_played: group.sessions.reduce((sum, s) => sum + s.games_played, 0),
+        aha_wins: group.sessions.reduce((sum, s) => sum + s.aha_wins, 0)
+      }));
+    }
+    
+    return filtered;
   };
   
   const filteredSessions = getFilteredSessions();
@@ -558,10 +594,11 @@ export default function AIBattle() {
                 });
               }
             } else {
-              // Starting - reset session stats
+              // Starting - reset session stats and start timer
               setStats({ ahaWins: 0, opponentWins: 0, totalGames: 0 });
               const dbScore = trainingData.length > 0 ? trainingData[0].aha_score : 0;
               setSessionAhaScore(dbScore);
+              setSessionStartTime(Date.now());
               setIsRunning(true);
             }
           }}
@@ -734,17 +771,33 @@ export default function AIBattle() {
           <CardHeader>
             <CardTitle className="flex items-center justify-between text-white">
               <span>Live Battle Status</span>
-              <div className="flex items-center gap-2">
-                <span className="text-sm text-slate-400">Speed:</span>
-                <input
-                  type="range"
-                  min="1"
-                  max="2000"
-                  value={speed}
-                  onChange={(e) => setSpeed(parseInt(e.target.value))}
-                  className="w-32"
-                />
-                <span className="text-sm text-slate-400">{speed}ms</span>
+              <div className="flex items-center gap-4">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-slate-400">Auto-Session:</span>
+                  <select
+                    value={autoSessionMinutes}
+                    onChange={(e) => setAutoSessionMinutes(parseInt(e.target.value))}
+                    className="bg-slate-700 text-white px-2 py-1 rounded text-sm"
+                    disabled={isRunning}
+                  >
+                    <option value={1}>1 min</option>
+                    <option value={2}>2 min</option>
+                    <option value={3}>3 min</option>
+                    <option value={5}>5 min</option>
+                  </select>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-slate-400">Speed:</span>
+                  <input
+                    type="range"
+                    min="1"
+                    max="2000"
+                    value={speed}
+                    onChange={(e) => setSpeed(parseInt(e.target.value))}
+                    className="w-32"
+                  />
+                  <span className="text-sm text-slate-400">{speed}ms</span>
+                </div>
               </div>
             </CardTitle>
           </CardHeader>
