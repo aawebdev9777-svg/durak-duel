@@ -232,39 +232,46 @@ export function aiSelectAttack(hand, tableCards, trumpSuit, difficulty, strategy
     const topHalf = sorted.slice(0, Math.ceil(sorted.length / 2));
     return topHalf[Math.floor(Math.random() * topHalf.length)];
   } else if (difficulty === 'aha') {
-    // AHA mode - uses REAL learned strategies from past games
+    // AHA mode - WORLD CLASS AI with learned strategies
     const rankCounts = {};
     validCards.forEach(c => {
       rankCounts[c.rank] = (rankCounts[c.rank] || 0) + 1;
     });
     
-    const weights = strategyWeights || { aggressive_factor: 1.5, trump_conservation: 1.3, card_value_threshold: 12 };
+    const weights = strategyWeights || { aggressive_factor: 2.0, trump_conservation: 1.5, card_value_threshold: 10 };
     
-    // Use learned data to make better decisions
+    // Prioritize learned successful moves
     if (learnedData && learnedData.length > 0) {
-      const learnedRanks = learnedData
-        .filter(d => d.card_played && d.reward > 0.4)
+      const highRewardMoves = learnedData
+        .filter(d => d.card_played && d.reward > 0.6 && d.was_successful)
         .map(d => d.card_played.rank);
       
-      // Prefer cards that had high rewards in past
-      const learnedCard = validCards.find(c => learnedRanks.includes(c.rank));
-      if (learnedCard && Math.random() > 0.3) {
-        return learnedCard;
+      const bestLearnedCard = validCards.find(c => highRewardMoves.includes(c.rank));
+      if (bestLearnedCard && Math.random() > 0.1) {
+        return bestLearnedCard;
       }
     }
     
-    // Advanced multi-attack strategy
-    const multiAttack = validCards.filter(c => rankCounts[c.rank] > 1);
-    if (multiAttack.length > 0 && Math.random() > (0.2 / weights.aggressive_factor)) {
-      return multiAttack.sort((a, b) => evaluateCard(a, trumpSuit, hand, weights) - evaluateCard(b, trumpSuit, hand, weights))[0];
+    // Aggressive duplicate attack strategy - force opponent to use multiple cards
+    const duplicates = validCards.filter(c => rankCounts[c.rank] > 1);
+    if (duplicates.length > 0 && Math.random() > 0.1) {
+      return duplicates.sort((a, b) => a.rank - b.rank)[0];
     }
     
-    // Consider hand size and game state
-    if (hand.length > 8) {
-      return sorted[0]; // Play conservatively with many cards
+    // Smart low card opening - save high cards for later
+    if (hand.length > 5 && deckSize > 10) {
+      const lowCards = validCards.filter(c => c.rank <= 9 && c.suit !== trumpSuit);
+      if (lowCards.length > 0) {
+        return lowCards[0];
+      }
     }
     
-    return sorted[Math.floor(Math.random() * Math.min(2, sorted.length))];
+    // Endgame aggression - use everything
+    if (deckSize === 0 || hand.length <= 3) {
+      return sorted[0];
+    }
+    
+    return sorted[0]; // Always play optimal card
   } else {
     // Hard/Champion - play optimally with some strategy
     const rankCounts = {};
@@ -362,32 +369,38 @@ export function aiSelectDefense(hand, attackCard, trumpSuit, difficulty, strateg
     if (Math.random() < 0.1) return null;
     return sorted[0];
   } else if (difficulty === 'aha') {
-    // AHA mode - REAL learned defense from reinforcement learning
+    // AHA mode - WORLD CLASS defense with learned patterns
     const lowestDefense = sorted[0];
     const attackValue = evaluateCard(attackCard, trumpSuit, [], strategyWeights);
     const defenseValue = evaluateCard(lowestDefense, trumpSuit, hand, strategyWeights);
     
-    const weights = strategyWeights || { card_value_threshold: 12 };
+    const weights = strategyWeights || { card_value_threshold: 8 };
     
-    // Use learned data - check what worked before
+    // Learn from successful defenses
     if (learnedData && learnedData.length > 0) {
-      const successfulDefenses = learnedData.filter(d => d.reward > 0.5 && d.card_played);
-      const avgHandSize = successfulDefenses.length > 0 
-        ? successfulDefenses.reduce((sum, d) => sum + d.hand_size, 0) / successfulDefenses.length 
-        : 4;
-      
-      // Learn when to take vs defend based on past success
-      if (hand.length < avgHandSize - 1 && defenseValue > attackValue + 10) {
-        if (Math.random() < 0.2) return null; // Learned to sometimes take when cards are valuable
+      const successfulDefenses = learnedData.filter(d => d.reward > 0.7 && d.was_successful && d.card_played);
+      if (successfulDefenses.length > 0) {
+        const successfulRanks = successfulDefenses.map(d => d.card_played.rank);
+        const learnedDefenseCard = validCards.find(c => successfulRanks.includes(c.rank));
+        if (learnedDefenseCard && Math.random() > 0.1) {
+          return learnedDefenseCard;
+        }
       }
     }
     
-    // Strategic decision on whether to defend
-    if (defenseValue > attackValue + weights.card_value_threshold && hand.length > 3) {
-      if (Math.random() < 0.15) return null;
+    // Smart defense - only take if losing too much value
+    if (defenseValue > attackValue + 20 && hand.length > 4 && deckSize > 5) {
+      return null; // Take cards if defense is too expensive
     }
     
-    // Minimal defense - don't overspend
+    // Prefer non-trump defenses to save trumps
+    const nonTrumpDefense = validCards.filter(c => c.suit !== trumpSuit);
+    if (nonTrumpDefense.length > 0) {
+      nonTrumpDefense.sort((a, b) => a.rank - b.rank);
+      return nonTrumpDefense[0];
+    }
+    
+    // Use minimal defense
     return sorted[0];
   } else {
     // Hard/Champion - optimal defense
@@ -417,20 +430,21 @@ export function aiShouldContinueAttack(hand, tableCards, defenderHandSize, trump
   } else if (difficulty === 'medium') {
     return Math.random() < 0.5 && validCards.some(c => evaluateCard(c, trumpSuit, hand, strategyWeights) < 15);
   } else if (difficulty === 'aha') {
-    const weights = strategyWeights || { aggressive_factor: 1.5, card_value_threshold: 12 };
+    const weights = strategyWeights || { aggressive_factor: 2.5, card_value_threshold: 10 };
     
-    // Learn from past successful multi-attacks
+    // AGGRESSIVE continuation - press the advantage
     if (learnedData && learnedData.length > 0) {
-      const multiAttacks = learnedData.filter(d => d.move_number > 1 && d.reward > 0.3);
-      if (multiAttacks.length > 5) {
-        // Learned that continuing attacks can be good
-        const lowValueCards = validCards.filter(c => evaluateCard(c, trumpSuit, hand, weights) < weights.card_value_threshold);
-        return lowValueCards.length > 0 && Math.random() < (0.85 * weights.aggressive_factor);
+      const successfulContinuations = learnedData.filter(d => d.move_number > 1 && d.reward > 0.5 && d.was_successful);
+      if (successfulContinuations.length > 3) {
+        // Learned that multi-attacks work well
+        const attackableCards = validCards.filter(c => evaluateCard(c, trumpSuit, hand, weights) < weights.card_value_threshold + 5);
+        return attackableCards.length > 0 && Math.random() < 0.95;
       }
     }
     
-    const lowValueCards = validCards.filter(c => evaluateCard(c, trumpSuit, hand, weights) < weights.card_value_threshold);
-    return lowValueCards.length > 0 && Math.random() < (0.75 * weights.aggressive_factor);
+    // Always continue if we have valid low-value cards
+    const lowValueCards = validCards.filter(c => evaluateCard(c, trumpSuit, hand, weights) < weights.card_value_threshold + 3);
+    return lowValueCards.length > 0 && Math.random() < 0.9;
   } else {
     // Champion - strategic continuation
     const lowValueCards = validCards.filter(c => evaluateCard(c, trumpSuit, hand, strategyWeights) < 12);
