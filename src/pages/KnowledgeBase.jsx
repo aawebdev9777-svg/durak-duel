@@ -22,7 +22,20 @@ import { createPageUrl } from '@/utils';
 
 export default function KnowledgeBase() {
   const [selectedFilter, setSelectedFilter] = useState('all');
-  const [isAdding, setIsAdding] = useState(false);
+  
+  // Auto-populate knowledge if empty
+  React.useEffect(() => {
+    if (knowledgeData.length === 0) {
+      (async () => {
+        try {
+          const { addMassiveKnowledge } = await import('@/functions/addMassiveKnowledge');
+          await addMassiveKnowledge();
+        } catch (e) {
+          console.error('Auto-populate failed:', e);
+        }
+      })();
+    }
+  }, [knowledgeData.length]);
   
   // Load AI training data
   const { data: trainingData = [] } = useQuery({
