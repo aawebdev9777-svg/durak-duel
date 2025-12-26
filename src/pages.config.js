@@ -3,6 +3,7 @@ import Home from './pages/Home';
 import KnowledgeBase from './pages/KnowledgeBase';
 import Training from './pages/Training';
 import AIBattle from './pages/AIBattle';
+import Tactics from './pages/Tactics';
 
 
 export const PAGES = {
@@ -11,6 +12,7 @@ export const PAGES = {
     "KnowledgeBase": KnowledgeBase,
     "Training": Training,
     "AIBattle": AIBattle,
+    "Tactics": Tactics,
 }
 
 export const pagesConfig = {

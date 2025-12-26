@@ -576,7 +576,12 @@ export default function AIBattle() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            {isRunning ? (
+            {!isRunning ? (
+              <div className="text-center py-8 text-slate-500">
+                Click "Start Battle" to begin continuous AI training matches
+                <div className="text-xs text-slate-600 mt-2">Set speed above 100ms to watch the games</div>
+              </div>
+            ) : speed < 100 ? (
               <div className="text-center py-8">
                 <motion.div
                   className="inline-block"
@@ -589,12 +594,87 @@ export default function AIBattle() {
                 <div className="text-slate-400 text-sm mt-2">
                   {currentGame && `Move ${currentGame.moveCount} • ${currentGame.phase === 'attack' ? 'Attacking' : 'Defending'}`}
                 </div>
+                <div className="text-xs text-amber-400 mt-3">
+                  Increase speed above 100ms to watch the game
+                </div>
               </div>
-            ) : (
-              <div className="text-center py-8 text-slate-500">
-                Click "Start Battle" to begin continuous AI training matches
+            ) : currentGame ? (
+              <div className="space-y-6">
+                {/* AI 1 - AHA */}
+                <div className="flex justify-center">
+                  <AIHand
+                    cardCount={currentGame.hands[0]?.length || 0}
+                    name="AHA AI"
+                    position="top"
+                    isAttacker={currentGame.attacker === 0}
+                    isDefender={currentGame.defender === 0}
+                    isThinking={false}
+                  />
+                </div>
+                
+                {/* Table */}
+                <div className="flex justify-center gap-3 min-h-32 items-center flex-wrap">
+                  {currentGame.tableCards.length === 0 ? (
+                    <div className="text-slate-500 italic">Waiting for attack...</div>
+                  ) : (
+                    currentGame.tableCards.map((pair, i) => (
+                      <motion.div
+                        key={`table-${i}`}
+                        className="relative"
+                        initial={{ scale: 0, y: -20 }}
+                        animate={{ scale: 1, y: 0 }}
+                      >
+                        <Card card={pair.attack} small />
+                        {pair.defense && (
+                          <motion.div
+                            className="absolute top-2 left-2"
+                            initial={{ scale: 0, rotate: -20 }}
+                            animate={{ scale: 1, rotate: 15 }}
+                          >
+                            <Card card={pair.defense} small />
+                          </motion.div>
+                        )}
+                      </motion.div>
+                    ))
+                  )}
+                </div>
+                
+                {/* Deck & Trump */}
+                <div className="flex justify-center items-center gap-4">
+                  <div className="text-slate-400 text-sm">
+                    Deck: {currentGame.deck?.length || 0}
+                  </div>
+                  {currentGame.trumpCard && (
+                    <div className="flex items-center gap-2">
+                      <span className="text-slate-400 text-sm">Trump:</span>
+                      <TrumpIndicator suit={currentGame.trumpSuit} />
+                    </div>
+                  )}
+                </div>
+                
+                {/* AI 2 - Hard AI */}
+                <div className="flex justify-center">
+                  <AIHand
+                    cardCount={currentGame.hands[1]?.length || 0}
+                    name="Hard AI (Training Partner)"
+                    position="top"
+                    isAttacker={currentGame.attacker === 1}
+                    isDefender={currentGame.defender === 1}
+                    isThinking={false}
+                  />
+                </div>
+                
+                {/* Move Info */}
+                <div className="text-center">
+                  <div className="text-white font-medium">
+                    Move {currentGame.moveCount} • {currentGame.phase === 'attack' ? 'Attacking' : 'Defending'}
+                  </div>
+                  <div className="text-slate-400 text-sm mt-1">
+                    {currentGame.attacker === 0 ? 'AHA AI attacking' : 'Hard AI attacking'}
+                  </div>
+                </div>
               </div>
-            )}
+            ) : null}
           </CardContent>
         </Card>
         
