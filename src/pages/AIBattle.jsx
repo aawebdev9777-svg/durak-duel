@@ -165,13 +165,13 @@ export default function AIBattle() {
           const newTimesWon = existingTactic.times_won + (wonGame ? 1 : 0);
           const newSuccessRate = newTimesWon / newTimesUsed;
 
-          // Confidence grows with wins, drops significantly with losses
+          // Confidence rises and falls naturally
           let confidenceChange = wonGame ? 0.12 : -0.08;
-          const newConfidence = Math.max(0.05, Math.min(0.99, existingTactic.confidence + confidenceChange));
+          const newConfidence = Math.max(0.01, Math.min(0.99, existingTactic.confidence + confidenceChange));
 
           try {
-            // Delete failed tactics
-            if (newTimesUsed >= 10 && (newSuccessRate < 0.35 || newConfidence < 0.1)) {
+            // Delete only completely failed tactics after many attempts
+            if (newTimesUsed >= 20 && newSuccessRate < 0.25 && newConfidence < 0.05) {
               await base44.entities.AHATactic.delete(existingTactic.id);
               await new Promise(resolve => setTimeout(resolve, 300));
             } else {
