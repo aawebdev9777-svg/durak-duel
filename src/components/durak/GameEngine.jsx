@@ -128,9 +128,57 @@ export function evaluateCard(card, trumpSuit, hand, strategyWeights = null) {
   return score;
 }
 
-export function aiSelectAttack(hand, tableCards, trumpSuit, difficulty, strategyWeights = null, learnedData = null, deckSize = 36, opponentHandSize = 6) {
+export function aiSelectAttack(hand, tableCards, trumpSuit, difficulty, strategyWeights = null, learnedData = null, deckSize = 36, opponentHandSize = 6, tactics = null) {
   const validCards = getValidAttackCards(hand, tableCards);
   if (validCards.length === 0) return null;
+  
+  // APPLY LEARNED TACTICS FIRST
+  if (difficulty === 'aha' && tactics && tactics.length > 0) {
+    const applicableTactics = tactics.filter(t => 
+      t.scenario?.phase === 'attack' &&
+      Math.abs((t.scenario.hand_size || 0) - hand.length) <= 2 &&
+      Math.abs((t.scenario.deck_remaining || 0) - deckSize) <= 10 &&
+      t.success_rate > 0.5
+    ).sort((a, b) => (b.success_rate * b.confidence) - (a.success_rate * a.confidence));
+    
+    if (applicableTactics.length > 0) {
+      const bestTactic = applicableTactics[0];
+      
+      // Apply tactic strategy
+      if (bestTactic.action?.card_preference === 'low_cards') {
+        const lowCards = validCards.filter(c => c.rank <= 8);
+        if (lowCards.length > 0) {
+          lowCards.sort((a, b) => a.rank - b.rank);
+          return lowCards[0];
+        }
+      } else if (bestTactic.action?.card_preference === 'high_trumps') {
+        const trumps = validCards.filter(c => c.suit === trumpSuit && c.rank >= 11);
+        if (trumps.length > 0) {
+          trumps.sort((a, b) => b.rank - a.rank);
+          return trumps[0];
+        }
+      } else if (bestTactic.action?.card_preference === 'duplicates') {
+        const ranks = {};
+        validCards.forEach(c => {
+          ranks[c.rank] = (ranks[c.rank] || 0) + 1;
+        });
+        const duplicateRanks = Object.keys(ranks).filter(r => ranks[r] > 1);
+        if (duplicateRanks.length > 0) {
+          const dupCard = validCards.find(c => duplicateRanks.includes(c.rank.toString()));
+          if (dupCard) return dupCard;
+        }
+      }
+      
+      // Use aggression level from tactic
+      if (bestTactic.action?.aggression_level > 0.7) {
+        validCards.sort((a, b) => b.rank - a.rank);
+        return validCards[0];
+      } else if (bestTactic.action?.aggression_level < 0.4) {
+        validCards.sort((a, b) => a.rank - b.rank);
+        return validCards[0];
+      }
+    }
+  }
   
   // Use advanced AI if available
   if (typeof window !== 'undefined' && window.AIStrategyEngine) {
@@ -204,8 +252,42 @@ export function aiSelectAttack(hand, tableCards, trumpSuit, difficulty, strategy
   }
 }
 
-export function aiSelectDefense(hand, attackCard, trumpSuit, difficulty, strategyWeights = null, learnedData = null, deckSize = 36, opponentHandSize = 6) {
+export function aiSelectDefense(hand, attackCard, trumpSuit, difficulty, strategyWeights = null, learnedData = null, deckSize = 36, opponentHandSize = 6, tactics = null) {
   const validCards = getValidDefenseCards(hand, attackCard, trumpSuit);
+  
+  // APPLY LEARNED TACTICS FOR DEFENSE FIRST
+  if (difficulty === 'aha' && tactics && tactics.length > 0) {
+    const applicableTactics = tactics.filter(t => 
+      t.scenario?.phase === 'defend' &&
+      Math.abs((t.scenario.hand_size || 0) - hand.length) <= 2 &&
+      Math.abs((t.scenario.deck_remaining || 0) - deckSize) <= 10 &&
+      t.success_rate > 0.5
+    ).sort((a, b) => (b.success_rate * b.confidence) - (a.success_rate * a.confidence));
+    
+    if (applicableTactics.length > 0 && validCards.length > 0) {
+      const bestTactic = applicableTactics[0];
+      
+      // Decide whether to defend or take based on learned tactic
+      if (bestTactic.action?.type === 'desperate_defense') {
+        validCards.sort((a, b) => evaluateCard(a, trumpSuit, hand, strategyWeights) - evaluateCard(b, trumpSuit, hand, strategyWeights));
+        return validCards[0];
+      } else if (bestTactic.action?.type === 'conservative') {
+        const lowDefenses = validCards.filter(c => c.rank <= 10);
+        if (lowDefenses.length > 0) {
+          lowDefenses.sort((a, b) => a.rank - b.rank);
+          return lowDefenses[0];
+        }
+        return null; // Take if no low cards
+      } else if (bestTactic.action?.type === 'trump_finish' && deckSize === 0) {
+        const trumpDefenses = validCards.filter(c => c.suit === trumpSuit);
+        if (trumpDefenses.length > 0) {
+          trumpDefenses.sort((a, b) => a.rank - b.rank);
+          return trumpDefenses[0];
+        }
+      }
+    }
+  }
+  
   if (validCards.length === 0) return null;
   
   // Use advanced AI if available
