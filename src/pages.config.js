@@ -1,18 +1,18 @@
+import AIBattle from './pages/AIBattle';
 import Game from './pages/Game';
 import Home from './pages/Home';
 import KnowledgeBase from './pages/KnowledgeBase';
-import Training from './pages/Training';
-import AIBattle from './pages/AIBattle';
 import Tactics from './pages/Tactics';
+import Training from './pages/Training';
 
 
 export const PAGES = {
+    "AIBattle": AIBattle,
     "Game": Game,
     "Home": Home,
     "KnowledgeBase": KnowledgeBase,
-    "Training": Training,
-    "AIBattle": AIBattle,
     "Tactics": Tactics,
+    "Training": Training,
 }
 
 export const pagesConfig = {

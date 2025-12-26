@@ -12,8 +12,10 @@ import {
   Trophy,
   Target,
   TrendingUp,
-  Brain
+  Brain,
+  Activity
 } from 'lucide-react';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { Link } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
 
@@ -61,6 +63,12 @@ export default function AIBattle() {
   const { data: tactics = [] } = useQuery({
     queryKey: ['ahaTactics'],
     queryFn: () => base44.entities.AHATactic.list('-success_rate', 50),
+    initialData: []
+  });
+  
+  const { data: sessions = [] } = useQuery({
+    queryKey: ['trainingSessions'],
+    queryFn: () => base44.entities.TrainingSession.list('-session_date', 20),
     initialData: []
   });
   
@@ -207,7 +215,7 @@ export default function AIBattle() {
   
   // Save training mutation with tactic learning
   const saveTrainingMutation = useMutation({
-    mutationFn: async ({ sessionGames, sessionWins, ahaScore }) => {
+    mutationFn: async ({ sessionGames, sessionWins, ahaScore, winRate }) => {
       if (trainingData.length > 0) {
         const current = trainingData[0];
         await base44.entities.AITrainingData.update(current.id, {
@@ -218,10 +226,22 @@ export default function AIBattle() {
         });
       }
       
+      // Save session data for the graph
+      if (sessionGames > 0) {
+        await base44.entities.TrainingSession.create({
+          session_date: new Date().toISOString(),
+          win_rate: winRate,
+          games_played: sessionGames,
+          aha_wins: sessionWins,
+          final_aha_score: ahaScore
+        });
+      }
+      
       },
       onSuccess: () => {
         queryClient.invalidateQueries({ queryKey: ['aiTraining'] });
         queryClient.invalidateQueries({ queryKey: ['ahaTactics'] });
+        queryClient.invalidateQueries({ queryKey: ['trainingSessions'] });
       }
       });
   
@@ -500,10 +520,12 @@ export default function AIBattle() {
               // Stopping - save session stats
               setIsRunning(false);
               if (stats.totalGames > 0) {
+                const sessionWinRate = ((stats.ahaWins / stats.totalGames) * 100);
                 saveTrainingMutation.mutate({
                   sessionGames: stats.totalGames,
                   sessionWins: stats.ahaWins,
-                  ahaScore: sessionAhaScore
+                  ahaScore: sessionAhaScore,
+                  winRate: sessionWinRate
                 });
               }
             } else {
@@ -758,6 +780,61 @@ export default function AIBattle() {
                     </div>
                   </motion.div>
                 ))}
+              </div>
+            )}
+          </CardContent>
+        </UICard>
+        
+        {/* Win Rate Progress Graph */}
+        <UICard className="bg-gradient-to-br from-cyan-900/30 to-slate-800/40 border-cyan-700/50">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-white">
+              <Activity className="w-5 h-5 text-cyan-400" />
+              Win Rate Progress
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {sessions.length === 0 ? (
+              <div className="text-center py-8 text-slate-500">
+                Complete a training session to see win rate progress
+              </div>
+            ) : (
+              <div className="h-64">
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={[...sessions].reverse()}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
+                    <XAxis 
+                      dataKey="session_date" 
+                      stroke="#94a3b8"
+                      tick={{ fill: '#94a3b8', fontSize: 12 }}
+                      tickFormatter={(value) => new Date(value).toLocaleDateString()}
+                    />
+                    <YAxis 
+                      stroke="#94a3b8"
+                      tick={{ fill: '#94a3b8', fontSize: 12 }}
+                      domain={[0, 100]}
+                      label={{ value: 'Win Rate %', angle: -90, position: 'insideLeft', fill: '#94a3b8' }}
+                    />
+                    <Tooltip 
+                      contentStyle={{ 
+                        backgroundColor: '#1e293b', 
+                        border: '1px solid #475569',
+                        borderRadius: '8px',
+                        color: '#fff'
+                      }}
+                      formatter={(value) => [`${value.toFixed(1)}%`, 'Win Rate']}
+                      labelFormatter={(label) => new Date(label).toLocaleString()}
+                    />
+                    <Line 
+                      type="monotone" 
+                      dataKey="win_rate" 
+                      stroke="#06b6d4" 
+                      strokeWidth={3}
+                      dot={{ fill: '#06b6d4', r: 4 }}
+                      activeDot={{ r: 6 }}
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
               </div>
             )}
           </CardContent>
