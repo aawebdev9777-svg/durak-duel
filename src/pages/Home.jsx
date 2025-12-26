@@ -12,7 +12,6 @@ import {
   ChevronRight,
   Crown,
   Sparkles,
-  Database,
   Zap
 } from 'lucide-react';
 
@@ -31,31 +30,7 @@ export default function Home() {
     initialData: []
   });
   
-  const { data: knowledgeCount } = useQuery({
-    queryKey: ['aiKnowledgeCount'],
-    queryFn: async () => {
-      const data = await base44.entities.AIKnowledge.list('-created_date', 1);
-      return data.length > 0 ? 'loaded' : 'empty';
-    },
-    initialData: 'empty'
-  });
-  
   const ahaScore = trainingData.length > 0 ? trainingData[0].aha_score : 0;
-
-  // Auto-populate knowledge if empty
-  React.useEffect(() => {
-    if (knowledgeCount === 'empty' && !window.autoPopulateStarted) {
-      window.autoPopulateStarted = true;
-      (async () => {
-        try {
-          const { addMassiveKnowledge } = await import('@/functions/addMassiveKnowledge');
-          await addMassiveKnowledge();
-        } catch (e) {
-          console.error('Auto-populate failed:', e);
-        }
-      })();
-    }
-  }, [knowledgeCount]);
   
   const difficulties = [
     { id: 'easy', label: 'Easy', description: 'For beginners' },
@@ -219,8 +194,7 @@ export default function Home() {
                 </div>
                 
                 <p className="text-slate-300 text-sm mb-4">
-                  Train the AHA AI through self-play to create the ultimate Durak opponent. 
-                  The more it trains, the stronger it becomes!
+                  AI learns tactics through battle experience. Watch it evolve and master Durak strategy!
                 </p>
                 
                 <div className="flex items-center gap-2 mb-2 text-purple-400/80 text-sm">
@@ -242,44 +216,38 @@ export default function Home() {
                       ⭐ GRANDMASTER LEVEL - Elite AI
                     </div>
                     <div className="text-xs text-slate-500 mb-4">
-                      Strong AI with advanced probability engine
+                      Learned from battle experience
                     </div>
                   </>
                 ) : ahaScore > 0 ? (
                   <>
                     <div className="text-xs text-blue-400 mb-2 font-bold">
-                      📈 TRAINING IN PROGRESS
+                      📈 LEARNING IN PROGRESS
                     </div>
                     <div className="text-xs text-slate-500 mb-4">
-                      Add more training data in Knowledge Base
+                      Gaining tactics from AI battles
                     </div>
                   </>
                 ) : (
                   <>
                     <div className="text-xs text-slate-400 mb-2">
-                      🎯 Ready for Training
+                      🎯 Ready to Learn
                     </div>
                     <div className="text-xs text-slate-500 mb-4">
-                      Visit Knowledge Base to train the AI
+                      Start AI Battle to begin learning
                     </div>
                   </>
                 )}
 
-                <div className="grid grid-cols-3 gap-2">
-                  <Link to={createPageUrl('KnowledgeBase')} className="block">
-                    <Button className="w-full bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white gap-2 border border-blue-500/50 text-xs">
-                      <Database className="w-4 h-4" />
-                      Data
-                    </Button>
-                  </Link>
+                <div className="grid grid-cols-2 gap-2">
                   <Link to={createPageUrl('Tactics')} className="block">
-                    <Button className="w-full bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-700 hover:to-amber-800 text-white gap-2 border border-amber-500/50 text-xs">
+                    <Button className="w-full bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-700 hover:to-amber-800 text-white gap-2 border border-amber-500/50">
                       <Brain className="w-4 h-4" />
                       Tactics
                     </Button>
                   </Link>
                   <Link to={createPageUrl('AIBattle')} className="block">
-                    <Button className="w-full bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 text-white gap-2 border border-purple-500/50 text-xs">
+                    <Button className="w-full bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 text-white gap-2 border border-purple-500/50">
                       <Zap className="w-4 h-4" />
                       Battle
                     </Button>
