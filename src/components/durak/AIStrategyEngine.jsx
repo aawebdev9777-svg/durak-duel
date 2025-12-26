@@ -98,7 +98,7 @@ export class AIStrategyEngine {
     }
   }
 
-  // AHA AI - Uses learned knowledge + probability + advanced tactics
+  // AHA AI - Minimax-inspired evaluation with MCTS simulation + learned patterns
   ahaStrategy(hand, gameState, action) {
     const { trumpSuit, tableCards, deckSize, opponentHandSize, ourHandSize } = gameState;
     const prob = new DurakProbabilityEngine(trumpSuit, deckSize, this.getVisibleCards(hand, tableCards));
@@ -114,42 +114,100 @@ export class AIStrategyEngine {
     let decision;
     
     if (action === 'attack') {
-      decision = prob.findOptimalAttack(hand, tableCards, opponentHandSize);
+      // Minimax-style evaluation: consider opponent's likely defenses
+      const candidates = this.getValidAttacks(hand, tableCards);
+      if (candidates.length === 0) return null;
       
-      // Apply learned patterns
-      if (similarSituations.length > 0) {
-        const learnedCard = this.applyLearnedPatterns(hand, similarSituations, 'attack');
-        if (learnedCard && Math.random() < 0.3) {
-          decision = learnedCard;
+      // Score each attack based on multiple factors
+      let bestCard = null;
+      let bestScore = -Infinity;
+      
+      for (const card of candidates) {
+        let score = 0;
+        
+        // 1. Card value (lower is better for attack)
+        score -= this.getCardStrength(card, trumpSuit) * 0.5;
+        
+        // 2. Opponent's defense probability (from MCTS simulation)
+        const defenseProb = prob.estimateDefenseProbability(card, opponentHandSize);
+        score += (1 - defenseProb) * 10; // Higher if opponent can't defend
+        
+        // 3. Learned patterns boost
+        const learnedBoost = this.getLearnedCardScore(card, similarSituations, 'attack');
+        score += learnedBoost * 3;
+        
+        // 4. Duplicate rank bonus (setup for multi-attack)
+        const duplicates = hand.filter(c => c.rank === card.rank).length;
+        score += (duplicates - 1) * 2;
+        
+        // 5. Greedy endgame strategy
+        if (deckSize === 0 && ourHandSize <= 3) {
+          score += this.evaluateEndgameAttack(card, hand, opponentHandSize, trumpSuit);
+        }
+        
+        // 6. Opening theory
+        if (tableCards.length === 0 && deckSize > 20) {
+          if (card.rank <= 8 && card.suit !== trumpSuit) score += 5;
+        }
+        
+        if (score > bestScore) {
+          bestScore = score;
+          bestCard = card;
         }
       }
       
-      // Advanced opening theory
-      if (tableCards.length === 0) {
-        decision = this.applyOpeningTheory(hand, trumpSuit, deckSize, opponentHandSize);
-      }
-      
-      // Endgame tactics
-      if (deckSize === 0 && ourHandSize <= 3) {
-        decision = this.applyEndgameTheory(hand, opponentHandSize, trumpSuit);
-      }
+      decision = bestCard;
     }
     
     if (action === 'defend') {
       const undefended = tableCards.find(p => !p.defense);
       if (!undefended) return null;
       
-      decision = prob.findOptimalDefense(undefended.attack, hand, opponentHandSize);
+      const validDefenses = hand.filter(c => this.canBeat(undefended.attack, c, trumpSuit));
+      if (validDefenses.length === 0) return null;
       
-      // Apply learned defense patterns
-      if (similarSituations.length > 0) {
-        const learnedCard = this.applyLearnedPatterns(hand, similarSituations, 'defense');
-        if (learnedCard && this.canBeat(undefended.attack, learnedCard, trumpSuit)) {
-          if (Math.random() < 0.25) {
-            decision = learnedCard;
+      // Minimax evaluation: choose minimal defense while considering future
+      let bestCard = null;
+      let bestScore = Infinity;
+      
+      for (const card of validDefenses) {
+        let score = 0;
+        
+        // 1. Minimize card value spent
+        score += this.getCardStrength(card, trumpSuit);
+        
+        // 2. Consider attack value vs defense value
+        const attackValue = this.getCardStrength(undefended.attack, trumpSuit);
+        const wasteScore = (score - attackValue) * 0.8;
+        score += wasteScore;
+        
+        // 3. Trump conservation in early/mid game
+        if (card.suit === trumpSuit && deckSize > 10) {
+          score += 15;
+        }
+        
+        // 4. Learned pattern penalty/bonus
+        const learnedScore = this.getLearnedCardScore(card, similarSituations, 'defense');
+        score -= learnedScore * 2;
+        
+        // 5. Endgame considerations
+        if (deckSize === 0) {
+          if (ourHandSize > opponentHandSize) {
+            // We're losing - be aggressive with defense
+            score -= 5;
+          } else {
+            // We're winning - take strategically if card too valuable
+            if (score > attackValue + 10) score = Infinity; // Consider taking
           }
         }
+        
+        if (score < bestScore) {
+          bestScore = score;
+          bestCard = card;
+        }
       }
+      
+      decision = bestCard;
     }
     
     return decision;
@@ -300,5 +358,43 @@ export class AIStrategyEngine {
       if (p.defense) visible.push(p.defense);
     });
     return visible;
+  }
+
+  // Get learned score for a card from knowledge base
+  getLearnedCardScore(card, situations, action) {
+    if (!situations || situations.length === 0) return 0;
+    
+    const relevantMoves = situations.filter(s => 
+      s.decision_type === action && 
+      s.card_played && 
+      Math.abs(s.card_played.rank - card.rank) <= 2
+    );
+    
+    if (relevantMoves.length === 0) return 0;
+    
+    const avgReward = relevantMoves.reduce((sum, m) => sum + m.reward, 0) / relevantMoves.length;
+    return avgReward * 5; // Scale up the learned score
+  }
+
+  // Evaluate endgame attack move
+  evaluateEndgameAttack(card, hand, opponentHandSize, trumpSuit) {
+    let score = 0;
+    
+    // If we have fewer cards, be aggressive with high cards
+    if (hand.length < opponentHandSize) {
+      score += (card.rank - 7) * 0.5;
+    }
+    
+    // If we're ahead, use low cards
+    if (hand.length > opponentHandSize) {
+      score -= (card.rank - 7) * 0.3;
+    }
+    
+    // Never waste trumps in endgame if not necessary
+    if (card.suit === trumpSuit && hand.length > 2) {
+      score -= 8;
+    }
+    
+    return score;
   }
 }
