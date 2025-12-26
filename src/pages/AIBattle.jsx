@@ -34,9 +34,9 @@ import {
 
 export default function AIBattle() {
   const [isRunning, setIsRunning] = useState(false);
-  const [stats, setStats] = useState({ ahaWins: 0, opponentWins: 0, draws: 0, totalGames: 0 });
+  const [stats, setStats] = useState({ ahaWins: 0, opponentWins: 0, totalGames: 0 });
   const [currentGame, setCurrentGame] = useState(null);
-  const [speed, setSpeed] = useState(10); // ms per move - fast by default
+  const [speed, setSpeed] = useState(100); // ms per move
   const [learnedData, setLearnedData] = useState(null);
   const [matchHistory, setMatchHistory] = useState([]);
   
@@ -422,21 +422,23 @@ export default function AIBattle() {
         if (!result) break;
         
         if (result.gameOver) {
-          // Game finished
-          const winner = result.durak === 0 ? 'opponent' : result.durak === 1 ? 'aha' : 'draw';
-          
+          // Game finished - in Durak, someone must be the durak (loser)
+          const winner = result.durak === 0 ? 'opponent' : 'aha';
+
           setStats(prev => ({
             ahaWins: prev.ahaWins + (winner === 'aha' ? 1 : 0),
             opponentWins: prev.opponentWins + (winner === 'opponent' ? 1 : 0),
-            draws: prev.draws + (winner === 'draw' ? 1 : 0),
             totalGames: prev.totalGames + 1
           }));
-          
-          setMatchHistory(prev => [{
-            winner,
-            moveCount: state.moveCount,
-            timestamp: new Date().toISOString()
-          }, ...prev.slice(0, 9)]);
+
+          // Only add to history if game had moves
+          if (state.moveCount > 0) {
+            setMatchHistory(prev => [{
+              winner,
+              moveCount: state.moveCount,
+              timestamp: new Date().toISOString()
+            }, ...prev.slice(0, 9)]);
+          }
           
           // Update AHA score
           const currentScore = trainingData.length > 0 ? trainingData[0].aha_score : 0;
@@ -556,7 +558,7 @@ export default function AIBattle() {
                 <span className="text-xs text-amber-400">WIN RATE</span>
               </div>
               <div className="text-3xl font-bold text-white mb-1">{winRate}%</div>
-              <div className="text-sm text-slate-400">Success Rate</div>
+              <div className="text-sm text-slate-400">Session Rate</div>
             </CardContent>
           </UICard>
           
@@ -594,8 +596,8 @@ export default function AIBattle() {
                 <span className="text-sm text-slate-400">Speed:</span>
                 <input
                   type="range"
-                  min="10"
-                  max="1000"
+                  min="1"
+                  max="2000"
                   value={speed}
                   onChange={(e) => setSpeed(parseInt(e.target.value))}
                   className="w-32"
@@ -610,7 +612,7 @@ export default function AIBattle() {
                 Click "Start Battle" to begin continuous AI training matches
                 <div className="text-xs text-slate-600 mt-2">Set speed above 100ms to watch the games</div>
               </div>
-            ) : speed < 100 ? (
+            ) : speed < 50 ? (
               <div className="text-center py-8">
                 <motion.div
                   className="inline-block"
@@ -624,7 +626,7 @@ export default function AIBattle() {
                   {currentGame && `Move ${currentGame.moveCount} • ${currentGame.phase === 'attack' ? 'Attacking' : 'Defending'}`}
                 </div>
                 <div className="text-xs text-amber-400 mt-3">
-                  Increase speed above 100ms to watch the game
+                  Increase speed above 50ms to watch the game
                 </div>
               </div>
             ) : currentGame ? (
@@ -784,7 +786,7 @@ export default function AIBattle() {
                       )}
                       <div>
                         <div className="text-white font-medium">
-                          {match.winner === 'aha' ? 'AHA AI Victory' : match.winner === 'opponent' ? 'Hard AI Victory' : 'Draw'}
+                          {match.winner === 'aha' ? 'AHA AI Victory' : 'Hard AI Victory'}
                         </div>
                         <div className="text-xs text-slate-400">
                           {match.moveCount} moves • {new Date(match.timestamp).toLocaleTimeString()}
