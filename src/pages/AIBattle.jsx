@@ -403,7 +403,15 @@ export default function AIBattle() {
     return null;
   };
   
-  // Auto-restart sessions
+  // Auto-restart sessions - use refs to avoid re-creating interval
+  const statsRef = useRef(stats);
+  const sessionAhaScoreRef = useRef(sessionAhaScore);
+  
+  useEffect(() => {
+    statsRef.current = stats;
+    sessionAhaScoreRef.current = sessionAhaScore;
+  }, [stats, sessionAhaScore]);
+  
   useEffect(() => {
     if (!isRunning || !sessionStartTime) return;
     
@@ -411,13 +419,13 @@ export default function AIBattle() {
       const elapsed = Date.now() - sessionStartTime;
       const targetMs = autoSessionMinutes * 60 * 1000;
       
-      if (elapsed >= targetMs && stats.totalGames > 0) {
+      if (elapsed >= targetMs && statsRef.current.totalGames > 0) {
         // Auto-save and restart session
-        const sessionWinRate = ((stats.ahaWins / stats.totalGames) * 100);
+        const sessionWinRate = ((statsRef.current.ahaWins / statsRef.current.totalGames) * 100);
         saveTrainingMutation.mutate({
-          sessionGames: stats.totalGames,
-          sessionWins: stats.ahaWins,
-          ahaScore: sessionAhaScore,
+          sessionGames: statsRef.current.totalGames,
+          sessionWins: statsRef.current.ahaWins,
+          ahaScore: sessionAhaScoreRef.current,
           winRate: sessionWinRate
         });
         
@@ -428,7 +436,7 @@ export default function AIBattle() {
     }, 5000); // Check every 5 seconds
     
     return () => clearInterval(checkInterval);
-  }, [isRunning, sessionStartTime, stats, sessionAhaScore, autoSessionMinutes]);
+  }, [isRunning, sessionStartTime, autoSessionMinutes]);
   
   useEffect(() => {
     isRunningRef.current = isRunning;
