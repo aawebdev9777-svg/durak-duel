@@ -246,7 +246,7 @@ export default function Game() {
             state.deck.length,
             state.hands[state.defender].length
           );
-          if (attackCard) {
+          if (attackCard && attackCard.suit && attackCard.rank) {
             const newHands = [...state.hands];
             newHands[aiPlayer] = newHands[aiPlayer].filter(c => c.id !== attackCard.id);
             
@@ -284,7 +284,7 @@ export default function Game() {
               state.deck.length,
               state.hands[state.defender].length
             );
-            if (attackCard) {
+            if (attackCard && attackCard.suit && attackCard.rank) {
               const newHands = [...state.hands];
               newHands[aiPlayer] = newHands[aiPlayer].filter(c => c.id !== attackCard.id);
               
@@ -295,6 +295,7 @@ export default function Game() {
               });
               setGameMessage('More cards to defend!');
             } else {
+              setAiThinking(null);
               endRound(false);
             }
           } else {
@@ -316,7 +317,7 @@ export default function Game() {
             state.hands[state.attacker].length
           );
           
-          if (defenseCard) {
+          if (defenseCard && defenseCard.suit && defenseCard.rank) {
             const newHands = [...state.hands];
             newHands[aiPlayer] = newHands[aiPlayer].filter(c => c.id !== defenseCard.id);
             
