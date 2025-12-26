@@ -70,13 +70,13 @@ function generateExpertGame() {
 
 export async function populateKnowledgeBase() {
   console.log('🚀🚀🚀 ULTIMATE AHA AI TRAINING INITIATED 🚀🚀🚀');
-  console.log('📊 Generating 50,000 Expert Game Records');
+  console.log('📊 Generating 10,000 Expert Game Records');
   console.log('🧠 Advanced Strategies: Opening Theory, Mid-Game Tactics, Endgame Mastery');
-  console.log('⏱️ Estimated Time: 2-3 minutes');
+  console.log('⏱️ Estimated Time: 1-2 minutes');
   console.log('');
   
-  const TOTAL_RECORDS = 50000;
-  const BATCH_SIZE = 250;
+  const TOTAL_RECORDS = 10000;
+  const BATCH_SIZE = 100;
   const BATCHES = Math.ceil(TOTAL_RECORDS / BATCH_SIZE);
   
   let totalCreated = 0;
@@ -146,10 +146,8 @@ export async function populateKnowledgeBase() {
           console.log(`✅ ${progress}% | ${totalCreated.toLocaleString()} records | ${elapsed}s elapsed | ${rate} rec/sec`);
         }
         
-        // Throttle every 5 batches
-        if (batch % 5 === 0 && batch > 0) {
-          await new Promise(r => setTimeout(r, 200));
-        }
+        // Throttle after every batch
+        await new Promise(r => setTimeout(r, 150));
       } catch (error) {
         attempts++;
         if (attempts < 3) {
