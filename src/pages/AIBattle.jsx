@@ -90,14 +90,14 @@ export default function AIBattle() {
           card_preference: wonGame ? 'low_cards' : 'medium_cards',
           aggression_level: wonGame ? 0.8 : 0.4
         },
-        success_rate: wonGame ? 0.7 : 0.3,
+        success_rate: wonGame ? 0.6 : 0.4,
         times_used: 1,
         times_won: wonGame ? 1 : 0,
         learned_from_game: gameId,
-        confidence: wonGame ? 0.8 : 0.5
+        confidence: 0.3 // Start low, will increase with wins
       });
     }
-    
+
     // Analyze midgame (moves 4-10)
     if (moveCount >= 8) {
       newTactics.push({
@@ -113,14 +113,14 @@ export default function AIBattle() {
           card_preference: wonGame ? 'duplicates' : 'singles',
           aggression_level: wonGame ? 0.9 : 0.3
         },
-        success_rate: wonGame ? 0.75 : 0.25,
+        success_rate: wonGame ? 0.6 : 0.4,
         times_used: 1,
         times_won: wonGame ? 1 : 0,
         learned_from_game: gameId,
-        confidence: wonGame ? 0.85 : 0.4
+        confidence: 0.3 // Start low
       });
     }
-    
+
     // Analyze endgame
     newTactics.push({
       tactic_name: wonGame ? 'Endgame Domination' : 'Endgame Struggle',
@@ -135,11 +135,11 @@ export default function AIBattle() {
         card_preference: wonGame ? 'high_trumps' : 'any_valid',
         aggression_level: wonGame ? 1.0 : 0.2
       },
-      success_rate: wonGame ? 0.9 : 0.1,
+      success_rate: wonGame ? 0.6 : 0.4,
       times_used: 1,
       times_won: wonGame ? 1 : 0,
       learned_from_game: gameId,
-      confidence: wonGame ? 0.95 : 0.3
+      confidence: 0.3 // Start low
     });
     
     // Save only 1 tactic per game to reduce API calls
@@ -153,24 +153,34 @@ export default function AIBattle() {
       }
     }
     
-    // Update only 1 similar tactic to reduce API calls
-    for (const existingTactic of tactics.slice(0, 1)) {
-      const similarity = calculateTacticSimilarity(existingTactic, newTactics[0]);
-      if (similarity > 0.7) {
-        const newTimesUsed = existingTactic.times_used + 1;
-        const newTimesWon = existingTactic.times_won + (wonGame ? 1 : 0);
-        const newSuccessRate = newTimesWon / newTimesUsed;
-        
-        try {
-          await base44.entities.AHATactic.update(existingTactic.id, {
-            times_used: newTimesUsed,
-            times_won: newTimesWon,
-            success_rate: newSuccessRate,
-            confidence: Math.min(0.99, existingTactic.confidence + 0.02)
-          });
-          await new Promise(resolve => setTimeout(resolve, 300));
-        } catch (error) {
-          console.error('Tactic update failed:', error);
+    // Update ALL similar tactics to strengthen learning (limit to top 5)
+    for (const newTactic of newTactics) {
+      let foundSimilar = false;
+
+      for (const existingTactic of tactics.slice(0, 5)) {
+        const similarity = calculateTacticSimilarity(existingTactic, newTactic);
+        if (similarity > 0.65) {
+          foundSimilar = true;
+          const newTimesUsed = existingTactic.times_used + 1;
+          const newTimesWon = existingTactic.times_won + (wonGame ? 1 : 0);
+          const newSuccessRate = newTimesWon / newTimesUsed;
+
+          // Confidence grows significantly with wins, drops slightly with losses
+          let confidenceChange = wonGame ? 0.08 : -0.03;
+          const newConfidence = Math.max(0.1, Math.min(0.99, existingTactic.confidence + confidenceChange));
+
+          try {
+            await base44.entities.AHATactic.update(existingTactic.id, {
+              times_used: newTimesUsed,
+              times_won: newTimesWon,
+              success_rate: newSuccessRate,
+              confidence: newConfidence
+            });
+            await new Promise(resolve => setTimeout(resolve, 300));
+            break; // Only update first similar tactic per new tactic
+          } catch (error) {
+            console.error('Tactic update failed:', error);
+          }
         }
       }
     }
