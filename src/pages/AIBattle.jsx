@@ -203,51 +203,23 @@ export default function AIBattle() {
   
   // Save training mutation with tactic learning
   const saveTrainingMutation = useMutation({
-    mutationFn: async ({ winner, moveCount, ahaScore, gameState }) => {
+    mutationFn: async ({ sessionGames, sessionWins, ahaScore }) => {
       if (trainingData.length > 0) {
         const current = trainingData[0];
         await base44.entities.AITrainingData.update(current.id, {
-          games_played: (current.games_played || 0) + 1,
-          games_won: (current.games_won || 0) + (winner === 'aha' ? 1 : 0),
+          games_played: (current.games_played || 0) + sessionGames,
+          games_won: (current.games_won || 0) + sessionWins,
           aha_score: ahaScore,
-          total_moves: (current.total_moves || 0) + moveCount,
           last_training_date: new Date().toISOString()
         });
       }
       
-      // LEARN TACTICS from this game
-      await learnTacticsFromGame(gameState, winner, moveCount);
-      
-      // Log knowledge from this game (reduced to 10 records)
-      const knowledgeBatch = [];
-      for (let i = 0; i < Math.min(10, moveCount); i++) {
-        knowledgeBatch.push({
-          game_id: `battle_${Date.now()}_${i}`,
-          move_number: i + 1,
-          game_phase: i % 2 === 0 ? 'attack' : 'defend',
-          decision_type: ['attack', 'defense'][i % 2],
-          was_successful: winner === 'aha',
-          reward: winner === 'aha' ? 0.8 : -0.3,
-          aha_score_at_time: ahaScore,
-          hand_size: 6 - Math.floor(i / 3)
-        });
+      },
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: ['aiTraining'] });
+        queryClient.invalidateQueries({ queryKey: ['ahaTactics'] });
       }
-      
-      if (knowledgeBatch.length > 0) {
-        try {
-          await base44.entities.AIKnowledge.bulkCreate(knowledgeBatch);
-          await new Promise(resolve => setTimeout(resolve, 500));
-        } catch (error) {
-          console.error('Knowledge save failed:', error);
-        }
-      }
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['aiTraining'] });
-      queryClient.invalidateQueries({ queryKey: ['aiKnowledge'] });
-      queryClient.invalidateQueries({ queryKey: ['ahaTactics'] });
-    }
-  });
+      });
   
   const initGame = () => {
     const deck = createDeck();
@@ -468,25 +440,13 @@ export default function AIBattle() {
           
           // Update AHA score
           const currentScore = trainingData.length > 0 ? trainingData[0].aha_score : 0;
+          // Update AHA score in training data for display purposes only
           const newScore = winner === 'aha' 
             ? Math.min(50000, currentScore + 20)
             : Math.max(0, currentScore - 5);
-          
-          // Save every 10 games to avoid rate limits
-          if (stats.totalGames % 10 === 0) {
-            try {
-              await saveTrainingMutation.mutateAsync({
-                winner,
-                moveCount: state.moveCount,
-                ahaScore: newScore,
-                gameState: state
-              });
-              // Add delay after saving to prevent rate limiting
-              await new Promise(resolve => setTimeout(resolve, 1000));
-            } catch (error) {
-              console.error('Save failed:', error);
-            }
-          }
+
+          // Learn tactics from the game
+          await learnTacticsFromGame(state, winner, state.moveCount);
           
           // Start new game
           state = initGame();
@@ -528,7 +488,24 @@ export default function AIBattle() {
         </div>
         
         <Button
-          onClick={() => setIsRunning(!isRunning)}
+          onClick={() => {
+            if (isRunning) {
+              // Stopping - save session stats
+              setIsRunning(false);
+              if (stats.totalGames > 0) {
+                const currentScore = trainingData.length > 0 ? trainingData[0].aha_score : 0;
+                saveTrainingMutation.mutate({
+                  sessionGames: stats.totalGames,
+                  sessionWins: stats.ahaWins,
+                  ahaScore: currentScore
+                });
+              }
+            } else {
+              // Starting - reset session stats
+              setStats({ ahaWins: 0, opponentWins: 0, draws: 0, totalGames: 0 });
+              setIsRunning(true);
+            }
+          }}
           className={`gap-2 ${isRunning ? 'bg-red-600 hover:bg-red-700' : 'bg-emerald-600 hover:bg-emerald-700'}`}
         >
           {isRunning ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
