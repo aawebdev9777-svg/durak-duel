@@ -39,6 +39,7 @@ export default function AIBattle() {
   const [speed, setSpeed] = useState(10); // ms per move - fast by default
   const [learnedData, setLearnedData] = useState(null);
   const [matchHistory, setMatchHistory] = useState([]);
+  const [sessionAhaScore, setSessionAhaScore] = useState(0);
   
   const gameRef = useRef(null);
   const isRunningRef = useRef(false);
@@ -68,6 +69,13 @@ export default function AIBattle() {
       setLearnedData(knowledgeData);
     }
   }, [knowledgeData]);
+
+  // Initialize session AHA score from database
+  useEffect(() => {
+    if (trainingData.length > 0) {
+      setSessionAhaScore(trainingData[0].aha_score || 0);
+    }
+  }, [trainingData]);
   
   // LEARN TACTICS FROM WINS/LOSSES
   const learnTacticsFromGame = async (gameState, winner, moveCount) => {
@@ -482,7 +490,8 @@ export default function AIBattle() {
     runBattle();
   }, [isRunning, speed, learnedData, trainingData]);
   
-  const currentAhaScore = trainingData.length > 0 ? trainingData[0].aha_score : 0;
+  const displayAhaScore = isRunning ? sessionAhaScore : (trainingData.length > 0 ? trainingData[0].aha_score : 0);
+  const displayTotalGames = (trainingData.length > 0 ? trainingData[0].games_played : 0) + (isRunning ? stats.totalGames : 0);
   const winRate = stats.totalGames > 0 ? ((stats.ahaWins / stats.totalGames) * 100).toFixed(1) : 0;
   
   return (
@@ -506,16 +515,17 @@ export default function AIBattle() {
               // Stopping - save session stats
               setIsRunning(false);
               if (stats.totalGames > 0) {
-                const currentScore = trainingData.length > 0 ? trainingData[0].aha_score : 0;
                 saveTrainingMutation.mutate({
                   sessionGames: stats.totalGames,
                   sessionWins: stats.ahaWins,
-                  ahaScore: currentScore
+                  ahaScore: sessionAhaScore
                 });
               }
             } else {
               // Starting - reset session stats
-              setStats({ ahaWins: 0, opponentWins: 0, draws: 0, totalGames: 0 });
+              setStats({ ahaWins: 0, opponentWins: 0, totalGames: 0 });
+              const dbScore = trainingData.length > 0 ? trainingData[0].aha_score : 0;
+              setSessionAhaScore(dbScore);
               setIsRunning(true);
             }
           }}
@@ -535,7 +545,7 @@ export default function AIBattle() {
                 <Brain className="w-5 h-5 text-purple-400" />
                 <span className="text-xs text-purple-400">AHA SCORE</span>
               </div>
-              <div className="text-3xl font-bold text-white mb-1">{currentAhaScore.toLocaleString()}</div>
+              <div className="text-3xl font-bold text-white mb-1">{displayAhaScore.toLocaleString()}</div>
               <div className="text-sm text-slate-400">Neural Network</div>
             </CardContent>
           </UICard>
@@ -591,7 +601,7 @@ export default function AIBattle() {
                 <span className="text-xs text-indigo-400">ALL TIME</span>
               </div>
               <div className="text-3xl font-bold text-white mb-1">
-                {trainingData.length > 0 ? trainingData[0].games_played.toLocaleString() : 0}
+                {displayTotalGames.toLocaleString()}
               </div>
               <div className="text-sm text-slate-400">Total Games</div>
             </CardContent>
