@@ -60,7 +60,7 @@ export default function Home() {
       await populateKnowledgeBase();
       console.log('✅ Training complete!');
       setIsAutoTraining(false);
-      alert('🎉 500,000 Expert Records Added! AI is GRANDMASTER level! Reloading...');
+      alert('🎉 50,000 Expert Records Added! AI is GRANDMASTER level! Reloading...');
       window.location.reload();
     } catch (error) {
       console.error('Training error:', error);
@@ -242,7 +242,7 @@ export default function Home() {
                 </div>
                 {isAutoTraining && (
                   <div className="text-xs text-amber-400 mb-2 animate-pulse">
-                    🔥 MEGA TRAINING 500K EXPERT RECORDS... 5-8 MINUTES! CHECK CONSOLE!
+                    🔥 TRAINING 50K EXPERT RECORDS... 2-3 MINUTES! CHECK CONSOLE!
                   </div>
                 )}
                 <div className="text-xs text-slate-500 mb-4">
