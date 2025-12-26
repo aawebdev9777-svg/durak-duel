@@ -180,9 +180,9 @@ export function aiSelectAttack(hand, tableCards, trumpSuit, difficulty, strategy
     }
   }
   
-  // Use advanced AI if available
+  // Use advanced AI with tactics
   if (typeof window !== 'undefined' && window.AIStrategyEngine) {
-    const ai = new window.AIStrategyEngine(difficulty, learnedData);
+    const ai = new window.AIStrategyEngine(difficulty, learnedData, tactics);
     const decision = ai.makeDecision(hand, {
       trumpSuit, tableCards, deckSize, opponentHandSize, ourHandSize: hand.length
     }, 'attack');
@@ -290,9 +290,9 @@ export function aiSelectDefense(hand, attackCard, trumpSuit, difficulty, strateg
   
   if (validCards.length === 0) return null;
   
-  // Use advanced AI if available
+  // Use advanced AI with tactics
   if (typeof window !== 'undefined' && window.AIStrategyEngine) {
-    const ai = new window.AIStrategyEngine(difficulty, learnedData);
+    const ai = new window.AIStrategyEngine(difficulty, learnedData, tactics);
     const decision = ai.makeDecision(hand, {
       trumpSuit, tableCards: [{ attack: attackCard, defense: null }], deckSize, opponentHandSize, ourHandSize: hand.length
     }, 'defend');

@@ -2,9 +2,10 @@
 import { DurakProbabilityEngine } from './AIProbability';
 
 export class AIStrategyEngine {
-  constructor(difficulty = 'aha', learnedKnowledge = null) {
+  constructor(difficulty = 'aha', learnedKnowledge = null, tactics = null) {
     this.difficulty = difficulty;
     this.knowledge = learnedKnowledge || [];
+    this.tactics = tactics || [];
     this.strategies = {
       easy: this.easyStrategy.bind(this),
       medium: this.mediumStrategy.bind(this),
@@ -98,10 +99,18 @@ export class AIStrategyEngine {
     }
   }
 
-  // AHA AI - Minimax-inspired evaluation with MCTS simulation + learned patterns
+  // AHA AI - Minimax-inspired evaluation with MCTS simulation + learned patterns + TACTICS
   ahaStrategy(hand, gameState, action) {
     const { trumpSuit, tableCards, deckSize, opponentHandSize, ourHandSize } = gameState;
     const prob = new DurakProbabilityEngine(trumpSuit, deckSize, this.getVisibleCards(hand, tableCards));
+    
+    // PRIORITY 1: APPLY LEARNED TACTICS (80% priority)
+    if (this.tactics && this.tactics.length > 0) {
+      const tacticDecision = this.applyTactics(hand, gameState, action, trumpSuit);
+      if (tacticDecision && Math.random() < 0.8) {
+        return tacticDecision;
+      }
+    }
     
     // Query learned knowledge for similar situations
     const similarSituations = this.findSimilarKnowledge({
@@ -400,5 +409,158 @@ export class AIStrategyEngine {
     }
     
     return score;
+  }
+
+  // APPLY LEARNED TACTICS - Main decision engine
+  applyTactics(hand, gameState, action, trumpSuit) {
+    const { deckSize, opponentHandSize, ourHandSize } = gameState;
+    
+    // Find applicable tactics sorted by success rate and confidence
+    const applicableTactics = this.tactics.filter(t => 
+      t.scenario?.phase === action &&
+      Math.abs((t.scenario.hand_size || 0) - ourHandSize) <= 2 &&
+      Math.abs((t.scenario.deck_remaining || 0) - deckSize) <= 15 &&
+      (t.success_rate || 0) > 0.4 &&
+      (t.confidence || 0) > 0.3
+    ).sort((a, b) => {
+      const scoreA = (a.success_rate || 0) * (a.confidence || 0) * (a.times_won || 1);
+      const scoreB = (b.success_rate || 0) * (b.confidence || 0) * (b.times_won || 1);
+      return scoreB - scoreA;
+    });
+    
+    if (applicableTactics.length === 0) return null;
+    
+    // Use top 3 tactics with weighted random selection
+    const topTactics = applicableTactics.slice(0, 3);
+    const weights = topTactics.map(t => (t.success_rate || 0) * (t.confidence || 0));
+    const totalWeight = weights.reduce((sum, w) => sum + w, 0);
+    
+    let random = Math.random() * totalWeight;
+    let selectedTactic = topTactics[0];
+    
+    for (let i = 0; i < topTactics.length; i++) {
+      random -= weights[i];
+      if (random <= 0) {
+        selectedTactic = topTactics[i];
+        break;
+      }
+    }
+    
+    if (action === 'attack') {
+      return this.executeTacticAttack(selectedTactic, hand, gameState, trumpSuit);
+    } else {
+      return this.executeTacticDefense(selectedTactic, hand, gameState, trumpSuit);
+    }
+  }
+
+  // Execute attack tactic
+  executeTacticAttack(tactic, hand, gameState, trumpSuit) {
+    const { tableCards } = gameState;
+    const validCards = this.getValidAttacks(hand, tableCards);
+    if (validCards.length === 0) return null;
+    
+    const cardPref = tactic.action?.card_preference;
+    const aggressionLevel = tactic.action?.aggression_level || 0.5;
+    
+    // Card preference strategy
+    if (cardPref === 'low_cards') {
+      const lowCards = validCards.filter(c => c.rank <= 8);
+      if (lowCards.length > 0) {
+        lowCards.sort((a, b) => a.rank - b.rank);
+        return lowCards[0];
+      }
+    }
+    
+    if (cardPref === 'high_trumps') {
+      const highTrumps = validCards.filter(c => c.suit === trumpSuit && c.rank >= 11);
+      if (highTrumps.length > 0) {
+        highTrumps.sort((a, b) => b.rank - a.rank);
+        return highTrumps[0];
+      }
+    }
+    
+    if (cardPref === 'duplicates') {
+      const ranks = {};
+      validCards.forEach(c => {
+        ranks[c.rank] = (ranks[c.rank] || 0) + 1;
+      });
+      const dupRanks = Object.keys(ranks).filter(r => ranks[r] > 1);
+      if (dupRanks.length > 0) {
+        const dupCard = validCards.find(c => dupRanks.includes(c.rank.toString()));
+        if (dupCard) return dupCard;
+      }
+    }
+    
+    if (cardPref === 'medium_cards') {
+      const medCards = validCards.filter(c => c.rank >= 9 && c.rank <= 11);
+      if (medCards.length > 0) {
+        medCards.sort((a, b) => a.rank - b.rank);
+        return medCards[0];
+      }
+    }
+    
+    // Aggression-based selection
+    validCards.sort((a, b) => {
+      if (aggressionLevel > 0.7) {
+        return b.rank - a.rank; // High cards for aggressive
+      } else if (aggressionLevel < 0.4) {
+        return a.rank - b.rank; // Low cards for conservative
+      } else {
+        return Math.abs(a.rank - 9) - Math.abs(b.rank - 9); // Medium cards
+      }
+    });
+    
+    return validCards[0];
+  }
+
+  // Execute defense tactic
+  executeTacticDefense(tactic, hand, gameState, trumpSuit) {
+    const { tableCards } = gameState;
+    const undefended = tableCards.find(p => !p.defense);
+    if (!undefended) return null;
+    
+    const validDefenses = hand.filter(c => this.canBeat(undefended.attack, c, trumpSuit));
+    if (validDefenses.length === 0) return null;
+    
+    const tacticType = tactic.action?.type;
+    
+    // Execute based on tactic type
+    if (tacticType === 'desperate_defense') {
+      // Use any valid defense, minimal cost
+      validDefenses.sort((a, b) => this.getCardStrength(a, trumpSuit) - this.getCardStrength(b, trumpSuit));
+      return validDefenses[0];
+    }
+    
+    if (tacticType === 'conservative') {
+      // Only defend with low value cards, otherwise take
+      const lowDefenses = validDefenses.filter(c => c.rank <= 10 && c.suit !== trumpSuit);
+      if (lowDefenses.length > 0) {
+        lowDefenses.sort((a, b) => a.rank - b.rank);
+        return lowDefenses[0];
+      }
+      return null; // Take cards if no low defense
+    }
+    
+    if (tacticType === 'trump_finish') {
+      // Use trumps aggressively in endgame
+      const trumpDefenses = validDefenses.filter(c => c.suit === trumpSuit);
+      if (trumpDefenses.length > 0 && gameState.deckSize === 0) {
+        trumpDefenses.sort((a, b) => a.rank - b.rank);
+        return trumpDefenses[0];
+      }
+    }
+    
+    if (tacticType === 'aggressive_start' || tacticType === 'multi_attack') {
+      // Defend minimally to keep hand strong
+      const nonTrumps = validDefenses.filter(c => c.suit !== trumpSuit);
+      if (nonTrumps.length > 0) {
+        nonTrumps.sort((a, b) => a.rank - b.rank);
+        return nonTrumps[0];
+      }
+    }
+    
+    // Default: minimal defense
+    validDefenses.sort((a, b) => this.getCardStrength(a, trumpSuit) - this.getCardStrength(b, trumpSuit));
+    return validDefenses[0];
   }
 }
