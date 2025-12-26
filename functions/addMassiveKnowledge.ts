@@ -6,8 +6,8 @@ export async function addMassiveKnowledge() {
   const decisions = ['attack', 'defense', 'pass', 'take'];
   const phases = ['attack', 'defend'];
   
-  const totalRecords = 100000;
-  const batchSize = 500;
+  const totalRecords = 500000;
+  const batchSize = 1000;
   const batches = Math.ceil(totalRecords / batchSize);
   
   console.log(`🚀 Starting to add ${totalRecords.toLocaleString()} EXPERT knowledge records...`);
@@ -88,7 +88,7 @@ export async function addMassiveKnowledge() {
       games_won: Math.floor((totalRecords / 12) * 0.92), // 92% win rate
       successful_attacks: Math.floor(totalRecords * 0.48),
       successful_defenses: Math.floor(totalRecords * 0.44),
-      aha_score: 50000, // WORLD CHAMPION LEVEL
+      aha_score: 80000, // WORLD CHAMPION LEVEL
       strategy_weights: {
         aggressive_factor: 2.5,
         trump_conservation: 2.4,

@@ -219,14 +219,15 @@ export default function Game() {
     
     const timer = setTimeout(() => {
       const state = gameRef.current;
-      if (!state) {
+      if (!state || !state.hands || !state.hands[aiPlayer]) {
         setAiThinking(null);
         return;
       }
-      
+
       // Safety check - prevent infinite loops
       if (state.hands[aiPlayer].length === 0) {
         setAiThinking(null);
+        endRound(false);
         return;
       }
       
@@ -244,9 +245,9 @@ export default function Game() {
             trainedWeights, 
             learnedKnowledge,
             state.deck.length,
-            state.hands[state.defender].length
+            state.hands[state.defender]?.length || 0
           );
-          if (attackCard && attackCard.suit && attackCard.rank) {
+          if (attackCard && attackCard.suit && attackCard.rank && attackCard.id) {
             const newHands = [...state.hands];
             newHands[aiPlayer] = newHands[aiPlayer].filter(c => c.id !== attackCard.id);
             
@@ -282,9 +283,9 @@ export default function Game() {
               trainedWeights, 
               learnedKnowledge,
               state.deck.length,
-              state.hands[state.defender].length
-            );
-            if (attackCard && attackCard.suit && attackCard.rank) {
+              state.hands[state.defender]?.length || 0
+              );
+              if (attackCard && attackCard.suit && attackCard.rank && attackCard.id) {
               const newHands = [...state.hands];
               newHands[aiPlayer] = newHands[aiPlayer].filter(c => c.id !== attackCard.id);
               
@@ -314,10 +315,10 @@ export default function Game() {
             trainedWeights,
             learnedKnowledge,
             state.deck.length,
-            state.hands[state.attacker].length
+            state.hands[state.attacker]?.length || 0
           );
-          
-          if (defenseCard && defenseCard.suit && defenseCard.rank) {
+
+          if (defenseCard && defenseCard.suit && defenseCard.rank && defenseCard.id) {
             const newHands = [...state.hands];
             newHands[aiPlayer] = newHands[aiPlayer].filter(c => c.id !== defenseCard.id);
             
