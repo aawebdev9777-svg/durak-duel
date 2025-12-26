@@ -142,25 +142,36 @@ export default function AIBattle() {
       confidence: wonGame ? 0.95 : 0.3
     });
     
-    // Save all learned tactics
+    // Save only 1 tactic per game to reduce API calls
     if (newTactics.length > 0) {
-      await base44.entities.AHATactic.bulkCreate(newTactics);
+      const bestTactic = newTactics.sort((a, b) => b.confidence - a.confidence)[0];
+      try {
+        await base44.entities.AHATactic.create(bestTactic);
+        await new Promise(resolve => setTimeout(resolve, 300));
+      } catch (error) {
+        console.error('Tactic save failed:', error);
+      }
     }
     
-    // Update existing similar tactics
-    for (const existingTactic of tactics) {
+    // Update only 1 similar tactic to reduce API calls
+    for (const existingTactic of tactics.slice(0, 1)) {
       const similarity = calculateTacticSimilarity(existingTactic, newTactics[0]);
       if (similarity > 0.7) {
         const newTimesUsed = existingTactic.times_used + 1;
         const newTimesWon = existingTactic.times_won + (wonGame ? 1 : 0);
         const newSuccessRate = newTimesWon / newTimesUsed;
         
-        await base44.entities.AHATactic.update(existingTactic.id, {
-          times_used: newTimesUsed,
-          times_won: newTimesWon,
-          success_rate: newSuccessRate,
-          confidence: Math.min(0.99, existingTactic.confidence + 0.02)
-        });
+        try {
+          await base44.entities.AHATactic.update(existingTactic.id, {
+            times_used: newTimesUsed,
+            times_won: newTimesWon,
+            success_rate: newSuccessRate,
+            confidence: Math.min(0.99, existingTactic.confidence + 0.02)
+          });
+          await new Promise(resolve => setTimeout(resolve, 300));
+        } catch (error) {
+          console.error('Tactic update failed:', error);
+        }
       }
     }
   };
@@ -197,9 +208,9 @@ export default function AIBattle() {
       // LEARN TACTICS from this game
       await learnTacticsFromGame(gameState, winner, moveCount);
       
-      // Log knowledge from this game
+      // Log knowledge from this game (reduced to 10 records)
       const knowledgeBatch = [];
-      for (let i = 0; i < Math.min(20, moveCount); i++) {
+      for (let i = 0; i < Math.min(10, moveCount); i++) {
         knowledgeBatch.push({
           game_id: `battle_${Date.now()}_${i}`,
           move_number: i + 1,
@@ -213,7 +224,12 @@ export default function AIBattle() {
       }
       
       if (knowledgeBatch.length > 0) {
-        await base44.entities.AIKnowledge.bulkCreate(knowledgeBatch);
+        try {
+          await base44.entities.AIKnowledge.bulkCreate(knowledgeBatch);
+          await new Promise(resolve => setTimeout(resolve, 500));
+        } catch (error) {
+          console.error('Knowledge save failed:', error);
+        }
       }
     },
     onSuccess: () => {
@@ -446,14 +462,20 @@ export default function AIBattle() {
             ? Math.min(50000, currentScore + 20)
             : Math.max(0, currentScore - 5);
           
-          // Save every 3 games to learn tactics faster
-          if (stats.totalGames % 3 === 0) {
-            await saveTrainingMutation.mutateAsync({
-              winner,
-              moveCount: state.moveCount,
-              ahaScore: newScore,
-              gameState: state
-            });
+          // Save every 10 games to avoid rate limits
+          if (stats.totalGames % 10 === 0) {
+            try {
+              await saveTrainingMutation.mutateAsync({
+                winner,
+                moveCount: state.moveCount,
+                ahaScore: newScore,
+                gameState: state
+              });
+              // Add delay after saving to prevent rate limiting
+              await new Promise(resolve => setTimeout(resolve, 1000));
+            } catch (error) {
+              console.error('Save failed:', error);
+            }
           }
           
           // Start new game
