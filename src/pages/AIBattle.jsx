@@ -538,7 +538,7 @@ export default function AIBattle() {
       
       <div className="max-w-6xl mx-auto space-y-6">
         {/* Stats Grid */}
-        <div className="grid md:grid-cols-5 gap-4">
+        <div className="grid md:grid-cols-6 gap-4">
           <UICard className="bg-gradient-to-br from-purple-900/40 to-purple-800/30 border-purple-700/50">
             <CardContent className="p-6">
               <div className="flex items-center justify-between mb-2">
@@ -590,10 +590,23 @@ export default function AIBattle() {
                 <span className="text-xs text-blue-400">MATCHES</span>
               </div>
               <div className="text-3xl font-bold text-white mb-1">{stats.totalGames}</div>
+              <div className="text-sm text-slate-400">Session Games</div>
+            </CardContent>
+          </UICard>
+
+          <UICard className="bg-gradient-to-br from-indigo-900/40 to-indigo-800/30 border-indigo-700/50">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between mb-2">
+                <Trophy className="w-5 h-5 text-indigo-400" />
+                <span className="text-xs text-indigo-400">ALL TIME</span>
+              </div>
+              <div className="text-3xl font-bold text-white mb-1">
+                {trainingData.length > 0 ? trainingData[0].games_played.toLocaleString() : 0}
+              </div>
               <div className="text-sm text-slate-400">Total Games</div>
             </CardContent>
           </UICard>
-        </div>
+          </div>
         
         {/* Live Battle Status */}
         <UICard className="bg-slate-800/40 border-slate-700/50">
