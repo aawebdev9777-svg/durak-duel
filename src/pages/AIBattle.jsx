@@ -38,7 +38,7 @@ export default function AIBattle() {
   const [isRunning, setIsRunning] = useState(false);
   const [stats, setStats] = useState({ ahaWins: 0, opponentWins: 0, totalGames: 0 });
   const [currentGame, setCurrentGame] = useState(null);
-  const [speed, setSpeed] = useState(10); // ms per move - fast by default
+  const [speed, setSpeed] = useState(1); // ms per move - maximum speed for intense training
   const [learnedData, setLearnedData] = useState(null);
   const [matchHistory, setMatchHistory] = useState([]);
   const [sessionAhaScore, setSessionAhaScore] = useState(0);
@@ -91,6 +91,17 @@ export default function AIBattle() {
     }
   }, [trainingData]);
   
+  // Auto-start battle on page load
+  useEffect(() => {
+    if (!isRunning && trainingData.length > 0) {
+      setStats({ ahaWins: 0, opponentWins: 0, totalGames: 0 });
+      const dbScore = trainingData[0].aha_score || 0;
+      setSessionAhaScore(dbScore);
+      setSessionStartTime(Date.now());
+      setIsRunning(true);
+    }
+  }, [trainingData]);
+  
   // LEARN TACTICS AND ACTUAL GAMEPLAY SKILLS FROM WINS/LOSSES
   const learnTacticsFromGame = async (gameState, winner, moveCount, gameHistory) => {
     const gameId = `battle_${Date.now()}`;
@@ -107,7 +118,7 @@ export default function AIBattle() {
         table_state: JSON.stringify(move.tableState),
         decision_type: move.decisionType,
         was_successful: wonGame,
-        reward: wonGame ? (0.95 - (idx / gameHistory.length) * 0.2) : (-0.3 + (idx / gameHistory.length) * 0.2), // Higher rewards for winning moves
+        reward: wonGame ? (0.98 - (idx / gameHistory.length) * 0.15) : (-0.2 + (idx / gameHistory.length) * 0.15), // MAXIMUM rewards for winning moves
         aha_score_at_time: sessionAhaScore,
         strategy_snapshot: trainingData.length > 0 ? trainingData[0].strategy_weights : null
       }));
@@ -146,11 +157,11 @@ export default function AIBattle() {
         card_preference: ['low_cards', 'medium_cards', 'high_trumps', 'duplicates', 'singles', 'any_valid'][Math.floor(Math.random() * 6)],
         aggression_level: Math.random()
       },
-      success_rate: wonGame ? 0.65 : 0.40, // Start winning tactics with higher success rate
+      success_rate: wonGame ? 0.75 : 0.35, // Start winning tactics with very high success rate
       times_used: 1,
       times_won: wonGame ? 1 : 0,
       learned_from_game: gameId,
-      confidence: wonGame ? 0.35 : 0.15 // Higher initial confidence for winning tactics
+      confidence: wonGame ? 0.50 : 0.10 // VERY high initial confidence for winning tactics
     });
     
     // Try to update existing or create new - STRICTLY NO DUPLICATES
@@ -162,7 +173,7 @@ export default function AIBattle() {
         const newTimesUsed = exactMatch.times_used + 1;
         const newTimesWon = exactMatch.times_won + (wonGame ? 1 : 0);
         const newSuccessRate = newTimesWon / newTimesUsed;
-        let confidenceChange = wonGame ? 0.18 : -0.05; // Boost confidence faster on wins
+        let confidenceChange = wonGame ? 0.25 : -0.03; // MASSIVE confidence boost on wins
         const newConfidence = Math.max(0.01, Math.min(0.99, exactMatch.confidence + confidenceChange));
 
         try {
@@ -559,10 +570,10 @@ export default function AIBattle() {
             }, ...prev.slice(0, 9)]);
           }
           
-          // Update AHA score with aggressive learning from wins
+          // Update AHA score with MAXIMUM learning from wins
           const newScore = winner === 'aha' 
-            ? sessionAhaScore + 100 // Double reward for wins
-            : Math.max(0, sessionAhaScore - 5); // Less penalty for losses
+            ? sessionAhaScore + 200 // Massive reward for wins - train to world-class level
+            : Math.max(0, sessionAhaScore - 2); // Minimal penalty for losses
 
           setSessionAhaScore(newScore);
 
