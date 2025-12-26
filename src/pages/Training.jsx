@@ -473,15 +473,16 @@ export default function Training() {
       requestAnimationFrame(runUnvis);
     } else if (speed === 0) {
       // Maximum speed - run continuously without delay
-      const runContinuous = () => {
+      const runContinuous = async () => {
         if (!isRunningRef.current) return;
-        runTurn();
+        await runTurn();
         if (isRunningRef.current) {
-          setTimeout(runContinuous, 0);
+          requestAnimationFrame(runContinuous);
         }
       };
       runContinuous();
     } else {
+      // Use actual speed value for the interval
       timerRef.current = setInterval(runTurn, speed);
     }
     
