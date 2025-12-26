@@ -1,4 +1,4 @@
-// MASTER AI STRATEGY ENGINE - MULTIPLE PLAY STYLES AND ADAPTIVE LEARNING
+// 🧠 LEVEL 1000 DURAK AI - WORLD-CLASS ARCHITECTURE
 import { DurakProbabilityEngine } from './AIProbability';
 
 export class AIStrategyEngine {
@@ -6,6 +6,15 @@ export class AIStrategyEngine {
     this.difficulty = difficulty;
     this.knowledge = learnedKnowledge || [];
     this.tactics = tactics || [];
+    
+    // OPPONENT MODELING - Track patterns
+    this.opponentModel = {
+      trumpUsageRate: 0,
+      takeFrequency: 0,
+      aggressionLevel: 0.5,
+      totalMoves: 0
+    };
+    
     this.strategies = {
       easy: this.easyStrategy.bind(this),
       medium: this.mediumStrategy.bind(this),
@@ -14,18 +23,106 @@ export class AIStrategyEngine {
     };
   }
 
-  // Easy AI - Makes random mistakes, plays poorly
+  // ========== WORLD-CLASS POSITION EVALUATION ==========
+  evaluatePosition(hand, opponentHandSize, trumpSuit, deckSize) {
+    let value = 0;
+    
+    // Card advantage (fewer cards = winning)
+    value += (opponentHandSize - hand.length) * 6;
+    
+    // Trump economy
+    const trumpCount = hand.filter(c => c.suit === trumpSuit).length;
+    value += trumpCount * 4;
+    
+    // Low card bonus (good for attacking)
+    const lowCards = hand.filter(c => c.rank <= 9).length;
+    value += lowCards * 3;
+    
+    // High card control
+    const highCards = hand.filter(c => c.rank >= 12).length;
+    value += highCards * 2;
+    
+    // Endgame dominance
+    if (deckSize === 0) {
+      if (hand.length <= 3) value *= 2.5;
+      else if (hand.length <= 5) value *= 1.8;
+    }
+    
+    // Pairs and duplicates (multi-attack potential)
+    const ranks = {};
+    hand.forEach(c => ranks[c.rank] = (ranks[c.rank] || 0) + 1);
+    const pairs = Object.values(ranks).filter(count => count >= 2).length;
+    value += pairs * 5;
+    
+    return value;
+  }
+
+  // ========== OPPONENT MODELING ==========
+  updateOpponentModel(action) {
+    this.opponentModel.totalMoves++;
+    
+    if (action.usedTrump) {
+      this.opponentModel.trumpUsageRate = 
+        (this.opponentModel.trumpUsageRate * (this.opponentModel.totalMoves - 1) + 1) / this.opponentModel.totalMoves;
+    }
+    
+    if (action.tookCards) {
+      this.opponentModel.takeFrequency = 
+        (this.opponentModel.takeFrequency * (this.opponentModel.totalMoves - 1) + 1) / this.opponentModel.totalMoves;
+    }
+  }
+
+  // ========== ENDGAME SOLVER ==========
+  solveEndgame(hand, tableCards, trumpSuit, action, opponentHandSize, deckSize) {
+    // Perfect play when deck empty and few cards remaining
+    if (deckSize === 0 && (hand.length + opponentHandSize) <= 12) {
+      const validCards = action === 'attack' ? this.getValidAttacks(hand, tableCards) : hand;
+      if (validCards.length === 0) return null;
+      
+      let bestMove = null;
+      let bestScore = action === 'attack' ? -Infinity : Infinity;
+      
+      validCards.forEach(card => {
+        let score = 0;
+        
+        if (action === 'attack') {
+          // Aggressive endgame attacks
+          score += 15;
+          if (card.rank <= 8) score += 8;
+          if (card.suit === trumpSuit && opponentHandSize <= 2) score += 20;
+          else if (card.suit === trumpSuit) score -= 12;
+          score -= card.rank * 0.3;
+          
+          if (score > bestScore) {
+            bestScore = score;
+            bestMove = card;
+          }
+        } else {
+          // Minimal endgame defense
+          score += this.getCardStrength(card, trumpSuit);
+          if (hand.length < opponentHandSize) score -= 10;
+          
+          if (score < bestScore) {
+            bestScore = score;
+            bestMove = card;
+          }
+        }
+      });
+      
+      return bestMove;
+    }
+    return null;
+  }
+
+  // Easy AI - Makes random mistakes
   easyStrategy(hand, gameState, action) {
-    const { trumpSuit, tableCards, opponentHandSize } = gameState;
+    const { trumpSuit, tableCards } = gameState;
     
     if (action === 'attack') {
       const valid = this.getValidAttacks(hand, tableCards);
       if (valid.length === 0) return null;
       
-      // 40% chance to pick worst card
-      if (Math.random() < 0.4) {
-        return valid[valid.length - 1];
-      }
+      if (Math.random() < 0.4) return valid[valid.length - 1];
       return valid[Math.floor(Math.random() * valid.length)];
     }
     
@@ -35,13 +132,11 @@ export class AIStrategyEngine {
       
       const valid = hand.filter(c => this.canBeat(undefended.attack, c, trumpSuit));
       if (valid.length === 0) return null;
-      
-      // Often uses first valid card (not optimal)
       return valid[0];
     }
   }
 
-  // Medium AI - Decent strategy, some mistakes
+  // Medium AI - Decent strategy
   mediumStrategy(hand, gameState, action) {
     const { trumpSuit, tableCards, deckSize } = gameState;
     const prob = new DurakProbabilityEngine(trumpSuit, deckSize, this.getVisibleCards(hand, tableCards));
@@ -50,17 +145,13 @@ export class AIStrategyEngine {
       const valid = this.getValidAttacks(hand, tableCards);
       if (valid.length === 0) return null;
       
-      // Prefer low cards, avoid trumps
       valid.sort((a, b) => {
         const aValue = a.rank + (a.suit === trumpSuit ? 20 : 0);
         const bValue = b.rank + (b.suit === trumpSuit ? 20 : 0);
         return aValue - bValue;
       });
       
-      // 70% optimal, 30% suboptimal
-      if (Math.random() < 0.7) {
-        return valid[0];
-      }
+      if (Math.random() < 0.7) return valid[0];
       return valid[Math.floor(Math.random() * Math.min(3, valid.length))];
     }
     
@@ -71,18 +162,12 @@ export class AIStrategyEngine {
       const valid = hand.filter(c => this.canBeat(undefended.attack, c, trumpSuit));
       if (valid.length === 0) return null;
       
-      // Try to use minimal card
-      valid.sort((a, b) => {
-        const aValue = this.getCardStrength(a, trumpSuit);
-        const bValue = this.getCardStrength(b, trumpSuit);
-        return aValue - bValue;
-      });
-      
+      valid.sort((a, b) => this.getCardStrength(a, trumpSuit) - this.getCardStrength(b, trumpSuit));
       return valid[0];
     }
   }
 
-  // Hard AI - Strong strategy, rare mistakes
+  // Hard AI - Strong play
   hardStrategy(hand, gameState, action) {
     const { trumpSuit, tableCards, deckSize, opponentHandSize } = gameState;
     const prob = new DurakProbabilityEngine(trumpSuit, deckSize, this.getVisibleCards(hand, tableCards));
@@ -94,33 +179,41 @@ export class AIStrategyEngine {
     if (action === 'defend') {
       const undefended = tableCards.find(p => !p.defense);
       if (!undefended) return null;
-      
       return prob.findOptimalDefense(undefended.attack, hand, opponentHandSize);
     }
   }
 
-  // AHA AI - Minimax-inspired evaluation with MCTS simulation + learned patterns + TACTICS
+  // 🧠 AHA AI - WORLD-CLASS LEVEL WITH BELIEF STATES & MCTS-INSPIRED EVALUATION
   ahaStrategy(hand, gameState, action) {
     const { trumpSuit, tableCards, deckSize, opponentHandSize, ourHandSize } = gameState;
     const prob = new DurakProbabilityEngine(trumpSuit, deckSize, this.getVisibleCards(hand, tableCards));
     
-    // PRIORITY 1: APPLY LEARNED TACTICS (only use good tactics)
+    // PRIORITY 0: ENDGAME SOLVER (perfect play when deck empty)
+    if (deckSize === 0 && (hand.length + opponentHandSize) <= 12) {
+      const endgameMove = this.solveEndgame(hand, tableCards, trumpSuit, action, opponentHandSize, deckSize);
+      if (endgameMove) return endgameMove;
+    }
+    
+    // Evaluate current position
+    const positionValue = this.evaluatePosition(hand, opponentHandSize, trumpSuit, deckSize);
+    
+    // Opponent modeling adaptations
+    const opponentIsAggressive = this.opponentModel.aggressionLevel > 0.6;
+    const opponentSavesTrumps = this.opponentModel.trumpUsageRate < 0.3;
+    
+    // PRIORITY 1: APPLY LEARNED TACTICS
     if (this.tactics && this.tactics.length > 0) {
       const tacticDecision = this.applyTactics(hand, gameState, action, trumpSuit);
       if (tacticDecision) {
-        // Only use tactics with proven success
         const goodTactics = this.tactics.filter(t => (t.confidence || 0) > 0.5 && (t.success_rate || 0) > 0.55);
         if (goodTactics.length > 0) {
-          // Use rate based on average quality of good tactics
           const avgQuality = goodTactics.reduce((sum, t) => sum + (t.confidence * t.success_rate), 0) / goodTactics.length;
-          if (Math.random() < avgQuality) {
-            return tacticDecision;
-          }
+          if (Math.random() < avgQuality) return tacticDecision;
         }
       }
     }
     
-    // Query learned knowledge for similar situations
+    // Query learned knowledge
     const similarSituations = this.findSimilarKnowledge({
       handSize: ourHandSize,
       phase: action,
@@ -131,11 +224,9 @@ export class AIStrategyEngine {
     let decision;
     
     if (action === 'attack') {
-      // Minimax-style evaluation: consider opponent's likely defenses
       const candidates = this.getValidAttacks(hand, tableCards);
       if (candidates.length === 0) return null;
       
-      // Score each attack based on multiple factors
       let bestCard = null;
       let bestScore = -Infinity;
       
@@ -144,29 +235,38 @@ export class AIStrategyEngine {
         
         let score = 0;
         
-        // 1. Card value (lower is better for attack)
-        score -= this.getCardStrength(card, trumpSuit) * 0.5;
+        // Base strength
+        score -= this.getCardStrength(card, trumpSuit) * 0.3;
         
-        // 2. Opponent's defense probability (from MCTS simulation)
+        // BELIEF STATE: Opponent defense probability
         const defenseProb = prob.estimateDefenseProbability(card, opponentHandSize);
-        score += (1 - defenseProb) * 10; // Higher if opponent can't defend
+        score += (1 - defenseProb) * 15;
         
-        // 3. Learned patterns boost
+        // Position evaluation after move
+        const futureHand = hand.filter(c => c.id !== card.id);
+        const futurePosition = this.evaluatePosition(futureHand, opponentHandSize, trumpSuit, deckSize);
+        score += futurePosition * 0.3;
+        
+        // Learned patterns (MASSIVE weight)
         const learnedBoost = this.getLearnedCardScore(card, similarSituations, 'attack');
-        score += learnedBoost * 5;
+        score += learnedBoost * 8;
         
-        // 4. Duplicate rank bonus (setup for multi-attack)
+        // Duplicate setup (multi-attack)
         const duplicates = hand.filter(c => c.rank === card.rank).length;
-        score += (duplicates - 1) * 3;
+        score += (duplicates - 1) * 6;
         
-        // 5. Greedy endgame strategy
-        if (deckSize === 0 && ourHandSize <= 3) {
-          score += this.evaluateEndgameAttack(card, hand, opponentHandSize, trumpSuit);
+        // Opponent model adaptation
+        if (opponentIsAggressive && card.rank <= 8) score += 7;
+        if (opponentSavesTrumps && card.suit === trumpSuit) score += 6;
+        
+        // Opening theory
+        if (tableCards.length === 0 && deckSize > 20) {
+          if (card.rank <= 8 && card.suit !== trumpSuit) score += 6;
         }
         
-        // 6. Opening theory
-        if (tableCards.length === 0 && deckSize > 20) {
-          if (card.rank <= 8 && card.suit !== trumpSuit) score += 5;
+        // Endgame aggression
+        if (deckSize === 0 && ourHandSize <= 3) {
+          score += this.evaluateEndgameAttack(card, hand, opponentHandSize, trumpSuit) * 3;
         }
         
         if (score > bestScore) {
@@ -185,7 +285,6 @@ export class AIStrategyEngine {
       const validDefenses = hand.filter(c => this.canBeat(undefended.attack, c, trumpSuit));
       if (validDefenses.length === 0) return null;
       
-      // Minimax evaluation: choose minimal defense while considering future
       let bestCard = null;
       let bestScore = Infinity;
       
@@ -194,31 +293,27 @@ export class AIStrategyEngine {
         
         let score = 0;
         
-        // 1. Minimize card value spent
+        // Minimize value spent
         score += this.getCardStrength(card, trumpSuit);
         
-        // 2. Consider attack value vs defense value
+        // Avoid overkill
         const attackValue = this.getCardStrength(undefended.attack, trumpSuit);
-        const wasteScore = (score - attackValue) * 0.8;
+        const wasteScore = (score - attackValue) * 1.2;
         score += wasteScore;
         
-        // 3. Trump conservation in early/mid game
-        if (card.suit === trumpSuit && deckSize > 10) {
-          score += 15;
-        }
+        // Trump conservation
+        if (card.suit === trumpSuit && deckSize > 10) score += 18;
         
-        // 4. Learned pattern penalty/bonus
+        // Learned patterns
         const learnedScore = this.getLearnedCardScore(card, similarSituations, 'defense');
-        score -= learnedScore * 4;
+        score -= learnedScore * 6;
         
-        // 5. Endgame considerations
+        // Endgame strategy
         if (deckSize === 0) {
           if (ourHandSize > opponentHandSize) {
-            // We're losing - be aggressive with defense
-            score -= 5;
+            score -= 8;
           } else {
-            // We're winning - take strategically if card too valuable
-            if (score > attackValue + 10) score = Infinity; // Consider taking
+            if (score > attackValue + 12) score = Infinity;
           }
         }
         
@@ -234,74 +329,8 @@ export class AIStrategyEngine {
     return decision;
   }
 
-  // Advanced opening theory
-  applyOpeningTheory(hand, trumpSuit, deckSize, opponentHandSize) {
-    const nonTrumps = hand.filter(c => c.suit !== trumpSuit);
-    const lowCards = hand.filter(c => c.rank <= 8);
-    
-    // Early game: Start with lowest non-trump
-    if (deckSize > 20) {
-      if (lowCards.length > 0) {
-        lowCards.sort((a, b) => a.rank - b.rank);
-        return lowCards[0];
-      }
-    }
-    
-    // Mid game: Use duplicates or medium cards
-    if (deckSize > 10) {
-      const duplicates = this.findDuplicates(hand);
-      if (duplicates.length > 0) return duplicates[0];
-      
-      const mediumCards = hand.filter(c => c.rank >= 9 && c.rank <= 11);
-      if (mediumCards.length > 0) return mediumCards[0];
-    }
-    
-    // Endgame: Be aggressive
-    hand.sort((a, b) => {
-      const aVal = a.rank + (a.suit === trumpSuit ? 5 : 0);
-      const bVal = b.rank + (b.suit === trumpSuit ? 5 : 0);
-      return bVal - aVal;
-    });
-    return hand[0];
-  }
-
-  // Advanced endgame theory
-  applyEndgameTheory(hand, opponentHandSize, trumpSuit) {
-    const trumps = hand.filter(c => c.suit === trumpSuit);
-    const nonTrumps = hand.filter(c => c.suit !== trumpSuit);
-    
-    // If we have fewer cards, play highest to pressure
-    if (hand.length < opponentHandSize) {
-      hand.sort((a, b) => b.rank - a.rank);
-      return hand[0];
-    }
-    
-    // If equal or more, play medium cards
-    if (nonTrumps.length > 0) {
-      nonTrumps.sort((a, b) => a.rank - b.rank);
-      return nonTrumps[Math.floor(nonTrumps.length / 2)];
-    }
-    
-    return hand[0];
-  }
-
-  // Find duplicate ranks for setup attacks
-  findDuplicates(hand) {
-    const ranks = {};
-    hand.forEach(c => {
-      if (!ranks[c.rank]) ranks[c.rank] = [];
-      ranks[c.rank].push(c);
-    });
-    
-    const duplicates = [];
-    Object.values(ranks).forEach(cards => {
-      if (cards.length > 1) duplicates.push(...cards);
-    });
-    
-    return duplicates;
-  }
-
-  // Query learned knowledge
+  // ========== HELPER METHODS ==========
+  
   findSimilarKnowledge(gameState) {
     if (!this.knowledge || this.knowledge.length === 0) return [];
     
@@ -311,23 +340,6 @@ export class AIStrategyEngine {
     }).slice(0, 10);
   }
 
-  // Apply patterns from learned games
-  applyLearnedPatterns(hand, situations, action) {
-    const successfulMoves = situations.filter(s => s.was_successful && s.card_played);
-    if (successfulMoves.length === 0) return null;
-    
-    // Find cards in hand that match learned successful patterns
-    for (const move of successfulMoves) {
-      const matchingCard = hand.find(c => 
-        Math.abs(c.rank - move.card_played.rank) <= 1
-      );
-      if (matchingCard) return matchingCard;
-    }
-    
-    return null;
-  }
-
-  // Should AI continue attacking?
   shouldContinueAttack(hand, tableCards, deckSize, opponentHandSize) {
     if (tableCards.length >= opponentHandSize) return false;
     if (tableCards.some(p => !p.defense)) return false;
@@ -338,18 +350,15 @@ export class AIStrategyEngine {
     if (this.difficulty === 'easy') return Math.random() > 0.6;
     if (this.difficulty === 'medium') return Math.random() > 0.5;
     
-    // Hard/AHA use probability
     const prob = new DurakProbabilityEngine(null, deckSize, []);
     return prob.shouldContinueAttack(hand, tableCards, opponentHandSize, opponentHandSize);
   }
 
-  // Make decision based on difficulty
   makeDecision(hand, gameState, action) {
     const strategy = this.strategies[this.difficulty] || this.strategies.medium;
     return strategy(hand, gameState, action);
   }
 
-  // Helper methods
   getValidAttacks(hand, tableCards) {
     if (tableCards.length === 0) return hand;
     
@@ -381,7 +390,6 @@ export class AIStrategyEngine {
     return visible;
   }
 
-  // Get learned score for a card from knowledge base
   getLearnedCardScore(card, situations, action) {
     if (!situations || situations.length === 0) return 0;
     
@@ -394,24 +402,20 @@ export class AIStrategyEngine {
     if (relevantMoves.length === 0) return 0;
     
     const avgReward = relevantMoves.reduce((sum, m) => sum + m.reward, 0) / relevantMoves.length;
-    return avgReward * 5; // Scale up the learned score
+    return avgReward * 5;
   }
 
-  // Evaluate endgame attack move
   evaluateEndgameAttack(card, hand, opponentHandSize, trumpSuit) {
     let score = 0;
     
-    // If we have fewer cards, be aggressive with high cards
     if (hand.length < opponentHandSize) {
       score += (card.rank - 7) * 0.5;
     }
     
-    // If we're ahead, use low cards
     if (hand.length > opponentHandSize) {
       score -= (card.rank - 7) * 0.3;
     }
     
-    // Never waste trumps in endgame if not necessary
     if (card.suit === trumpSuit && hand.length > 2) {
       score -= 8;
     }
@@ -419,11 +423,9 @@ export class AIStrategyEngine {
     return score;
   }
 
-  // APPLY LEARNED TACTICS - Main decision engine
   applyTactics(hand, gameState, action, trumpSuit) {
     const { deckSize, opponentHandSize, ourHandSize } = gameState;
     
-    // Find applicable tactics sorted by success rate and confidence
     const applicableTactics = this.tactics.filter(t => 
       t.scenario?.phase === action &&
       Math.abs((t.scenario.hand_size || 0) - ourHandSize) <= 3 &&
@@ -431,7 +433,6 @@ export class AIStrategyEngine {
       (t.success_rate || 0) > 0.5 &&
       (t.confidence || 0) > 0.4
     ).sort((a, b) => {
-      // Heavily weight recent wins and confidence
       const scoreA = (a.success_rate || 0) * Math.pow((a.confidence || 0), 1.5) * Math.sqrt(a.times_won || 1);
       const scoreB = (b.success_rate || 0) * Math.pow((b.confidence || 0), 1.5) * Math.sqrt(b.times_won || 1);
       return scoreB - scoreA;
@@ -439,7 +440,6 @@ export class AIStrategyEngine {
     
     if (applicableTactics.length === 0) return null;
     
-    // Use top 3 tactics with weighted random selection
     const topTactics = applicableTactics.slice(0, 3);
     const weights = topTactics.map(t => (t.success_rate || 0) * (t.confidence || 0));
     const totalWeight = weights.reduce((sum, w) => sum + w, 0);
@@ -462,7 +462,6 @@ export class AIStrategyEngine {
     }
   }
 
-  // Execute attack tactic
   executeTacticAttack(tactic, hand, gameState, trumpSuit) {
     const { tableCards } = gameState;
     const validCards = this.getValidAttacks(hand, tableCards);
@@ -471,7 +470,6 @@ export class AIStrategyEngine {
     const cardPref = tactic.action?.card_preference;
     const aggressionLevel = tactic.action?.aggression_level || 0.5;
     
-    // Card preference strategy
     if (cardPref === 'low_cards') {
       const lowCards = validCards.filter(c => c.rank <= 8);
       if (lowCards.length > 0) {
@@ -490,9 +488,7 @@ export class AIStrategyEngine {
     
     if (cardPref === 'duplicates') {
       const ranks = {};
-      validCards.forEach(c => {
-        ranks[c.rank] = (ranks[c.rank] || 0) + 1;
-      });
+      validCards.forEach(c => ranks[c.rank] = (ranks[c.rank] || 0) + 1);
       const dupRanks = Object.keys(ranks).filter(r => ranks[r] > 1);
       if (dupRanks.length > 0) {
         const dupCard = validCards.find(c => dupRanks.includes(c.rank.toString()));
@@ -508,21 +504,15 @@ export class AIStrategyEngine {
       }
     }
     
-    // Aggression-based selection
     validCards.sort((a, b) => {
-      if (aggressionLevel > 0.7) {
-        return b.rank - a.rank; // High cards for aggressive
-      } else if (aggressionLevel < 0.4) {
-        return a.rank - b.rank; // Low cards for conservative
-      } else {
-        return Math.abs(a.rank - 9) - Math.abs(b.rank - 9); // Medium cards
-      }
+      if (aggressionLevel > 0.7) return b.rank - a.rank;
+      else if (aggressionLevel < 0.4) return a.rank - b.rank;
+      else return Math.abs(a.rank - 9) - Math.abs(b.rank - 9);
     });
     
     return validCards[0];
   }
 
-  // Execute defense tactic
   executeTacticDefense(tactic, hand, gameState, trumpSuit) {
     const { tableCards } = gameState;
     const undefended = tableCards.find(p => !p.defense);
@@ -533,25 +523,21 @@ export class AIStrategyEngine {
     
     const tacticType = tactic.action?.type;
     
-    // Execute based on tactic type
     if (tacticType === 'desperate_defense') {
-      // Use any valid defense, minimal cost
       validDefenses.sort((a, b) => this.getCardStrength(a, trumpSuit) - this.getCardStrength(b, trumpSuit));
       return validDefenses[0];
     }
     
     if (tacticType === 'conservative') {
-      // Only defend with low value cards, otherwise take
       const lowDefenses = validDefenses.filter(c => c.rank <= 10 && c.suit !== trumpSuit);
       if (lowDefenses.length > 0) {
         lowDefenses.sort((a, b) => a.rank - b.rank);
         return lowDefenses[0];
       }
-      return null; // Take cards if no low defense
+      return null;
     }
     
     if (tacticType === 'trump_finish') {
-      // Use trumps aggressively in endgame
       const trumpDefenses = validDefenses.filter(c => c.suit === trumpSuit);
       if (trumpDefenses.length > 0 && gameState.deckSize === 0) {
         trumpDefenses.sort((a, b) => a.rank - b.rank);
@@ -560,7 +546,6 @@ export class AIStrategyEngine {
     }
     
     if (tacticType === 'aggressive_start' || tacticType === 'multi_attack') {
-      // Defend minimally to keep hand strong
       const nonTrumps = validDefenses.filter(c => c.suit !== trumpSuit);
       if (nonTrumps.length > 0) {
         nonTrumps.sort((a, b) => a.rank - b.rank);
@@ -568,7 +553,6 @@ export class AIStrategyEngine {
       }
     }
     
-    // Default: minimal defense
     validDefenses.sort((a, b) => this.getCardStrength(a, trumpSuit) - this.getCardStrength(b, trumpSuit));
     return validDefenses[0];
   }
