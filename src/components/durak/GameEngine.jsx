@@ -132,51 +132,80 @@ export function aiSelectAttack(hand, tableCards, trumpSuit, difficulty, strategy
   const validCards = getValidAttackCards(hand, tableCards);
   if (validCards.length === 0) return null;
   
-  // APPLY LEARNED TACTICS FIRST
+  // ULTRA-POWERFUL TACTICAL AI - PRIORITIZE BEST TACTICS
   if (difficulty === 'aha' && tactics && tactics.length > 0) {
     const applicableTactics = tactics.filter(t => 
       t.scenario?.phase === 'attack' &&
-      Math.abs((t.scenario.hand_size || 0) - hand.length) <= 2 &&
-      Math.abs((t.scenario.deck_remaining || 0) - deckSize) <= 10 &&
-      t.success_rate > 0.5
-    ).sort((a, b) => (b.success_rate * b.confidence) - (a.success_rate * a.confidence));
+      Math.abs((t.scenario.hand_size || 0) - hand.length) <= 3 &&
+      Math.abs((t.scenario.deck_remaining || 0) - deckSize) <= 15 &&
+      t.success_rate > 0.45 &&
+      t.times_used >= 1
+    ).sort((a, b) => {
+      const scoreA = (a.success_rate * 2) + (a.confidence * 1.5) + (a.times_won / Math.max(a.times_used, 1));
+      const scoreB = (b.success_rate * 2) + (b.confidence * 1.5) + (b.times_won / Math.max(b.times_used, 1));
+      return scoreB - scoreA;
+    });
     
     if (applicableTactics.length > 0) {
       const bestTactic = applicableTactics[0];
       
-      // Apply tactic strategy
+      // APPLY BEST TACTIC STRATEGY WITH MAXIMUM EFFECTIVENESS
       if (bestTactic.action?.card_preference === 'low_cards') {
-        const lowCards = validCards.filter(c => c.rank <= 8);
+        const lowCards = validCards.filter(c => c.rank <= 9);
         if (lowCards.length > 0) {
           lowCards.sort((a, b) => a.rank - b.rank);
           return lowCards[0];
         }
+      } else if (bestTactic.action?.card_preference === 'medium_cards') {
+        const medCards = validCards.filter(c => c.rank >= 9 && c.rank <= 12);
+        if (medCards.length > 0) {
+          medCards.sort((a, b) => evaluateCard(a, trumpSuit, hand, strategyWeights) - evaluateCard(b, trumpSuit, hand, strategyWeights));
+          return medCards[0];
+        }
       } else if (bestTactic.action?.card_preference === 'high_trumps') {
-        const trumps = validCards.filter(c => c.suit === trumpSuit && c.rank >= 11);
+        const trumps = validCards.filter(c => c.suit === trumpSuit && c.rank >= 10);
         if (trumps.length > 0) {
           trumps.sort((a, b) => b.rank - a.rank);
           return trumps[0];
         }
       } else if (bestTactic.action?.card_preference === 'duplicates') {
         const ranks = {};
-        validCards.forEach(c => {
+        hand.forEach(c => {
           ranks[c.rank] = (ranks[c.rank] || 0) + 1;
         });
         const duplicateRanks = Object.keys(ranks).filter(r => ranks[r] > 1);
-        if (duplicateRanks.length > 0) {
-          const dupCard = validCards.find(c => duplicateRanks.includes(c.rank.toString()));
-          if (dupCard) return dupCard;
+        const dupCards = validCards.filter(c => duplicateRanks.includes(c.rank.toString()));
+        if (dupCards.length > 0) {
+          dupCards.sort((a, b) => a.rank - b.rank);
+          return dupCards[0];
+        }
+      } else if (bestTactic.action?.card_preference === 'singles') {
+        const ranks = {};
+        hand.forEach(c => {
+          ranks[c.rank] = (ranks[c.rank] || 0) + 1;
+        });
+        const singleCards = validCards.filter(c => ranks[c.rank] === 1);
+        if (singleCards.length > 0) {
+          singleCards.sort((a, b) => a.rank - b.rank);
+          return singleCards[0];
         }
       }
       
-      // Use aggression level from tactic
-      if (bestTactic.action?.aggression_level > 0.7) {
-        validCards.sort((a, b) => b.rank - a.rank);
-        return validCards[0];
-      } else if (bestTactic.action?.aggression_level < 0.4) {
+      // MASTER-LEVEL AGGRESSION CONTROL
+      if (bestTactic.action?.aggression_level > 0.65) {
+        const highCards = validCards.filter(c => c.rank >= 11 || c.suit === trumpSuit);
+        if (highCards.length > 0) {
+          highCards.sort((a, b) => b.rank - a.rank);
+          return highCards[0];
+        }
+      } else if (bestTactic.action?.aggression_level < 0.45) {
         validCards.sort((a, b) => a.rank - b.rank);
         return validCards[0];
       }
+      
+      // Execute tactic decision
+      validCards.sort((a, b) => evaluateCard(a, trumpSuit, hand, strategyWeights) - evaluateCard(b, trumpSuit, hand, strategyWeights));
+      return validCards[0];
     }
   }
   
@@ -255,36 +284,55 @@ export function aiSelectAttack(hand, tableCards, trumpSuit, difficulty, strategy
 export function aiSelectDefense(hand, attackCard, trumpSuit, difficulty, strategyWeights = null, learnedData = null, deckSize = 36, opponentHandSize = 6, tactics = null) {
   const validCards = getValidDefenseCards(hand, attackCard, trumpSuit);
   
-  // APPLY LEARNED TACTICS FOR DEFENSE FIRST
+  // ULTRA-SMART TACTICAL DEFENSE
   if (difficulty === 'aha' && tactics && tactics.length > 0) {
     const applicableTactics = tactics.filter(t => 
       t.scenario?.phase === 'defend' &&
-      Math.abs((t.scenario.hand_size || 0) - hand.length) <= 2 &&
-      Math.abs((t.scenario.deck_remaining || 0) - deckSize) <= 10 &&
-      t.success_rate > 0.5
-    ).sort((a, b) => (b.success_rate * b.confidence) - (a.success_rate * a.confidence));
+      Math.abs((t.scenario.hand_size || 0) - hand.length) <= 3 &&
+      Math.abs((t.scenario.deck_remaining || 0) - deckSize) <= 15 &&
+      t.success_rate > 0.45 &&
+      t.times_used >= 1
+    ).sort((a, b) => {
+      const scoreA = (a.success_rate * 2) + (a.confidence * 1.5) + (a.times_won / Math.max(a.times_used, 1));
+      const scoreB = (b.success_rate * 2) + (b.confidence * 1.5) + (b.times_won / Math.max(b.times_used, 1));
+      return scoreB - scoreA;
+    });
     
     if (applicableTactics.length > 0 && validCards.length > 0) {
       const bestTactic = applicableTactics[0];
       
-      // Decide whether to defend or take based on learned tactic
-      if (bestTactic.action?.type === 'desperate_defense') {
+      // MASTER-LEVEL TACTICAL DEFENSE DECISIONS
+      if (bestTactic.action?.type === 'desperate_defense' || bestTactic.action?.type === 'multi_attack') {
         validCards.sort((a, b) => evaluateCard(a, trumpSuit, hand, strategyWeights) - evaluateCard(b, trumpSuit, hand, strategyWeights));
         return validCards[0];
       } else if (bestTactic.action?.type === 'conservative') {
-        const lowDefenses = validCards.filter(c => c.rank <= 10);
+        const lowDefenses = validCards.filter(c => c.rank <= 11 && c.suit !== trumpSuit);
         if (lowDefenses.length > 0) {
           lowDefenses.sort((a, b) => a.rank - b.rank);
           return lowDefenses[0];
         }
-        return null; // Take if no low cards
-      } else if (bestTactic.action?.type === 'trump_finish' && deckSize === 0) {
+        // Only take if all defenses are too valuable
+        const avgDefenseValue = validCards.reduce((sum, c) => sum + evaluateCard(c, trumpSuit, hand, strategyWeights), 0) / validCards.length;
+        const attackValue = evaluateCard(attackCard, trumpSuit, [], strategyWeights);
+        if (avgDefenseValue > attackValue + 18) return null;
+        return validCards[0];
+      } else if (bestTactic.action?.type === 'trump_finish' && deckSize <= 5) {
         const trumpDefenses = validCards.filter(c => c.suit === trumpSuit);
         if (trumpDefenses.length > 0) {
           trumpDefenses.sort((a, b) => a.rank - b.rank);
           return trumpDefenses[0];
         }
+      } else if (bestTactic.action?.type === 'aggressive_start' && hand.length >= 5) {
+        const nonTrumpDefenses = validCards.filter(c => c.suit !== trumpSuit);
+        if (nonTrumpDefenses.length > 0) {
+          nonTrumpDefenses.sort((a, b) => a.rank - b.rank);
+          return nonTrumpDefenses[0];
+        }
       }
+      
+      // Use best available defense
+      validCards.sort((a, b) => evaluateCard(a, trumpSuit, hand, strategyWeights) - evaluateCard(b, trumpSuit, hand, strategyWeights));
+      return validCards[0];
     }
   }
   
