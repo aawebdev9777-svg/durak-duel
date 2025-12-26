@@ -40,6 +40,21 @@ export default function Home() {
   });
   
   const ahaScore = trainingData.length > 0 ? trainingData[0].aha_score : 0;
+
+  // Auto-populate knowledge if empty
+  React.useEffect(() => {
+    if (knowledgeCount === 'empty' && !window.autoPopulateStarted) {
+      window.autoPopulateStarted = true;
+      (async () => {
+        try {
+          const { addMassiveKnowledge } = await import('@/functions/addMassiveKnowledge');
+          await addMassiveKnowledge();
+        } catch (e) {
+          console.error('Auto-populate failed:', e);
+        }
+      })();
+    }
+  }, [knowledgeCount]);
   
   const difficulties = [
     { id: 'easy', label: 'Easy', description: 'For beginners' },
