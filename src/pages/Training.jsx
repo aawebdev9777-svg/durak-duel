@@ -63,6 +63,7 @@ export default function Training() {
   const gameRef = useRef(null);
   const timerRef = useRef(null);
   const isRunningRef = useRef(false);
+  const knowledgeBatchRef = useRef([]);
   const queryClient = useQueryClient();
   
   // Load AI training data
