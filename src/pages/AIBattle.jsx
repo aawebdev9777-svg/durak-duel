@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card as UICard, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { 
@@ -504,7 +504,7 @@ export default function AIBattle() {
       <div className="max-w-6xl mx-auto space-y-6">
         {/* Stats Grid */}
         <div className="grid md:grid-cols-5 gap-4">
-          <Card className="bg-gradient-to-br from-purple-900/40 to-purple-800/30 border-purple-700/50">
+          <UICard className="bg-gradient-to-br from-purple-900/40 to-purple-800/30 border-purple-700/50">
             <CardContent className="p-6">
               <div className="flex items-center justify-between mb-2">
                 <Brain className="w-5 h-5 text-purple-400" />
@@ -513,9 +513,9 @@ export default function AIBattle() {
               <div className="text-3xl font-bold text-white mb-1">{currentAhaScore.toLocaleString()}</div>
               <div className="text-sm text-slate-400">Neural Network</div>
             </CardContent>
-          </Card>
+          </UICard>
           
-          <Card className="bg-gradient-to-br from-emerald-900/40 to-emerald-800/30 border-emerald-700/50">
+          <UICard className="bg-gradient-to-br from-emerald-900/40 to-emerald-800/30 border-emerald-700/50">
             <CardContent className="p-6">
               <div className="flex items-center justify-between mb-2">
                 <Trophy className="w-5 h-5 text-emerald-400" />
@@ -524,9 +524,9 @@ export default function AIBattle() {
               <div className="text-3xl font-bold text-white mb-1">{stats.ahaWins}</div>
               <div className="text-sm text-slate-400">AHA Wins</div>
             </CardContent>
-          </Card>
+          </UICard>
           
-          <Card className="bg-gradient-to-br from-red-900/40 to-red-800/30 border-red-700/50">
+          <UICard className="bg-gradient-to-br from-red-900/40 to-red-800/30 border-red-700/50">
             <CardContent className="p-6">
               <div className="flex items-center justify-between mb-2">
                 <Target className="w-5 h-5 text-red-400" />
@@ -535,9 +535,9 @@ export default function AIBattle() {
               <div className="text-3xl font-bold text-white mb-1">{stats.opponentWins}</div>
               <div className="text-sm text-slate-400">Hard AI Wins</div>
             </CardContent>
-          </Card>
+          </UICard>
           
-          <Card className="bg-gradient-to-br from-amber-900/40 to-amber-800/30 border-amber-700/50">
+          <UICard className="bg-gradient-to-br from-amber-900/40 to-amber-800/30 border-amber-700/50">
             <CardContent className="p-6">
               <div className="flex items-center justify-between mb-2">
                 <TrendingUp className="w-5 h-5 text-amber-400" />
@@ -546,9 +546,9 @@ export default function AIBattle() {
               <div className="text-3xl font-bold text-white mb-1">{winRate}%</div>
               <div className="text-sm text-slate-400">Success Rate</div>
             </CardContent>
-          </Card>
+          </UICard>
           
-          <Card className="bg-gradient-to-br from-blue-900/40 to-blue-800/30 border-blue-700/50">
+          <UICard className="bg-gradient-to-br from-blue-900/40 to-blue-800/30 border-blue-700/50">
             <CardContent className="p-6">
               <div className="flex items-center justify-between mb-2">
                 <Zap className="w-5 h-5 text-blue-400" />
@@ -557,11 +557,11 @@ export default function AIBattle() {
               <div className="text-3xl font-bold text-white mb-1">{stats.totalGames}</div>
               <div className="text-sm text-slate-400">Total Games</div>
             </CardContent>
-          </Card>
+          </UICard>
         </div>
         
         {/* Live Battle Status */}
-        <Card className="bg-slate-800/40 border-slate-700/50">
+        <UICard className="bg-slate-800/40 border-slate-700/50">
           <CardHeader>
             <CardTitle className="flex items-center justify-between text-white">
               <span>Live Battle Status</span>
@@ -680,10 +680,10 @@ export default function AIBattle() {
               </div>
             ) : null}
           </CardContent>
-        </Card>
+        </UICard>
         
         {/* Learned Tactics */}
-        <Card className="bg-gradient-to-br from-amber-900/30 to-slate-800/40 border-amber-700/50">
+        <UICard className="bg-gradient-to-br from-amber-900/30 to-slate-800/40 border-amber-700/50">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-white">
               <Brain className="w-5 h-5 text-amber-400" />
@@ -728,10 +728,10 @@ export default function AIBattle() {
               </div>
             )}
           </CardContent>
-        </Card>
+        </UICard>
         
         {/* Match History */}
-        <Card className="bg-slate-800/40 border-slate-700/50">
+        <UICard className="bg-slate-800/40 border-slate-700/50">
           <CardHeader>
             <CardTitle className="text-white">Recent Matches</CardTitle>
           </CardHeader>
@@ -771,7 +771,7 @@ export default function AIBattle() {
               )}
             </div>
           </CardContent>
-        </Card>
+        </UICard>
         
         <div className="text-center text-slate-400 text-sm space-y-1">
           <p className="text-amber-400 font-bold">
