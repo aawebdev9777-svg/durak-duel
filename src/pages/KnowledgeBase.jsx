@@ -13,13 +13,30 @@ import {
   Award,
   Zap,
   Shield,
-  Activity
+  Activity,
+  Plus
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
+import { addMassiveKnowledge } from '@/functions/addMassiveKnowledge';
 
 export default function KnowledgeBase() {
   const [selectedFilter, setSelectedFilter] = useState('all');
+  const [isAdding, setIsAdding] = useState(false);
+  
+  const handleAddKnowledge = async () => {
+    if (isAdding) return;
+    setIsAdding(true);
+    try {
+      await addMassiveKnowledge();
+      alert('✅ 50,000 knowledge records added! Reloading...');
+      window.location.reload();
+    } catch (error) {
+      console.error(error);
+      alert('Check console for progress. Reloading...');
+      window.location.reload();
+    }
+  };
   
   // Load AI training data
   const { data: trainingData = [] } = useQuery({
@@ -80,12 +97,14 @@ export default function KnowledgeBase() {
           <h1 className="text-2xl font-bold text-white">AI Knowledge Base</h1>
         </div>
         
-        <Link to={createPageUrl('Training')}>
-          <Button className="bg-purple-600 hover:bg-purple-700 gap-2">
-            <Brain className="w-4 h-4" />
-            Train AI
-          </Button>
-        </Link>
+        <Button 
+          onClick={handleAddKnowledge}
+          disabled={isAdding}
+          className="bg-purple-600 hover:bg-purple-700 gap-2"
+        >
+          <Plus className="w-4 h-4" />
+          {isAdding ? 'Adding...' : 'Add 50K Records'}
+        </Button>
       </div>
       
       <div className="max-w-6xl mx-auto space-y-6">
