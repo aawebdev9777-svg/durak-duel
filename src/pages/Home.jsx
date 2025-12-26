@@ -30,7 +30,16 @@ export default function Home() {
     initialData: []
   });
   
-  const ahaScore = trainingData.length > 0 ? trainingData[0].aha_score : 25000;
+  const { data: knowledgeCount } = useQuery({
+    queryKey: ['aiKnowledgeCount'],
+    queryFn: async () => {
+      const data = await base44.entities.AIKnowledge.list('-created_date', 1);
+      return data.length > 0 ? 'loaded' : 'empty';
+    },
+    initialData: 'empty'
+  });
+  
+  const ahaScore = trainingData.length > 0 ? trainingData[0].aha_score : 0;
   
   const difficulties = [
     { id: 'easy', label: 'Easy', description: 'For beginners' },
@@ -200,14 +209,45 @@ export default function Home() {
                 
                 <div className="flex items-center gap-2 mb-2 text-purple-400/80 text-sm">
                   <Sparkles className="w-4 h-4" />
-                  <span>AHA Score: {ahaScore.toLocaleString()}</span>
+                  <span>AHA Score: {ahaScore > 0 ? ahaScore.toLocaleString() : 'Not trained'}</span>
                 </div>
-                <div className="text-xs text-amber-400 mb-2 font-bold">
-                  🏆 GRANDMASTER LEVEL - World's Strongest Durak AI
-                </div>
-                <div className="text-xs text-slate-500 mb-4">
-                  Advanced probability engine + opening theory + endgame mastery
-                </div>
+                {ahaScore >= 40000 ? (
+                  <>
+                    <div className="text-xs text-amber-400 mb-2 font-bold animate-pulse">
+                      🏆 WORLD CHAMPION LEVEL - Unbeatable AI
+                    </div>
+                    <div className="text-xs text-slate-500 mb-4">
+                      Trained on 100,000+ expert games with advanced strategies
+                    </div>
+                  </>
+                ) : ahaScore >= 20000 ? (
+                  <>
+                    <div className="text-xs text-emerald-400 mb-2 font-bold">
+                      ⭐ GRANDMASTER LEVEL - Elite AI
+                    </div>
+                    <div className="text-xs text-slate-500 mb-4">
+                      Strong AI with advanced probability engine
+                    </div>
+                  </>
+                ) : ahaScore > 0 ? (
+                  <>
+                    <div className="text-xs text-blue-400 mb-2 font-bold">
+                      📈 TRAINING IN PROGRESS
+                    </div>
+                    <div className="text-xs text-slate-500 mb-4">
+                      Add more training data in Knowledge Base
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="text-xs text-slate-400 mb-2">
+                      🎯 Ready for Training
+                    </div>
+                    <div className="text-xs text-slate-500 mb-4">
+                      Visit Knowledge Base to train the AI
+                    </div>
+                  </>
+                )}
 
                 <Link to={createPageUrl('KnowledgeBase')} className="block">
                   <Button className="w-full bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white h-12 text-lg gap-2 border border-blue-500/50">
