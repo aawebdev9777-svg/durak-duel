@@ -22,7 +22,6 @@ import { createPageUrl } from '@/utils';
 
 export default function KnowledgeBase() {
   const [selectedFilter, setSelectedFilter] = useState('all');
-  const [isAdding, setIsAdding] = useState(false);
   
   // Load AI training data
   const { data: trainingData = [] } = useQuery({
@@ -91,32 +90,12 @@ export default function KnowledgeBase() {
           <h1 className="text-2xl font-bold text-white">AI Knowledge Base</h1>
         </div>
         
-        <div className="flex gap-2">
-          <Button 
-            onClick={async () => {
-              setIsAdding(true);
-              try {
-                const { addMassiveKnowledge } = await import('@/functions/addMassiveKnowledge');
-                await addMassiveKnowledge();
-                window.location.reload();
-              } catch (e) {
-                alert('Error: ' + e.message);
-              }
-              setIsAdding(false);
-            }}
-            disabled={isAdding}
-            className="bg-amber-600 hover:bg-amber-700 gap-2"
-          >
-            <Plus className="w-4 h-4" />
-            {isAdding ? 'Adding...' : 'Add 500K Records'}
+        <Link to={createPageUrl('Training')}>
+          <Button className="bg-purple-600 hover:bg-purple-700 gap-2">
+            <Brain className="w-4 h-4" />
+            Train AI
           </Button>
-          <Link to={createPageUrl('Training')}>
-            <Button className="bg-purple-600 hover:bg-purple-700 gap-2">
-              <Brain className="w-4 h-4" />
-              Train AI
-            </Button>
-          </Link>
-        </div>
+        </Link>
       </div>
       
       <div className="max-w-6xl mx-auto space-y-6">
