@@ -47,6 +47,7 @@ export default function AIBattle() {
   const [sessionStartTime, setSessionStartTime] = useState(null);
   const [countdown, setCountdown] = useState(0);
   const [isGraphFullscreen, setIsGraphFullscreen] = useState(false);
+  const [gameHistory, setGameHistory] = useState([]);
   
   const gameRef = useRef(null);
   const isRunningRef = useRef(false);
@@ -90,10 +91,36 @@ export default function AIBattle() {
     }
   }, [trainingData]);
   
-  // LEARN TACTICS FROM WINS/LOSSES - NOW CREATES NEW TACTICS!
-  const learnTacticsFromGame = async (gameState, winner, moveCount) => {
+  // LEARN TACTICS AND ACTUAL GAMEPLAY SKILLS FROM WINS/LOSSES
+  const learnTacticsFromGame = async (gameState, winner, moveCount, gameHistory) => {
     const gameId = `battle_${Date.now()}`;
     const wonGame = winner === 'aha';
+    
+    // SAVE DETAILED GAME KNOWLEDGE - teach AI actual gameplay patterns
+    if (gameHistory && gameHistory.length > 0) {
+      const knowledgeRecords = gameHistory.map((move, idx) => ({
+        game_id: gameId,
+        move_number: idx + 1,
+        game_phase: move.phase,
+        card_played: move.card,
+        hand_size: move.handSize,
+        table_state: JSON.stringify(move.tableState),
+        decision_type: move.decisionType,
+        was_successful: wonGame,
+        reward: wonGame ? (0.8 - (idx / gameHistory.length) * 0.3) : (-0.5 + (idx / gameHistory.length) * 0.3),
+        aha_score_at_time: sessionAhaScore,
+        strategy_snapshot: trainingData.length > 0 ? trainingData[0].strategy_weights : null
+      }));
+      
+      // Save in batches
+      if (knowledgeRecords.length > 0) {
+        try {
+          await base44.entities.AIKnowledge.bulkCreate(knowledgeRecords.slice(0, 50)); // Max 50 moves per game
+        } catch (error) {
+          console.error('Failed to save game knowledge:', error);
+        }
+      }
+    }
     
     // Generate experimental tactic names
     const tacticTypes = ['Opening', 'Midgame', 'Endgame', 'Trump Control', 'Card Conservation', 'Aggressive Push', 'Defensive Hold'];
@@ -246,6 +273,7 @@ export default function AIBattle() {
     
     gameRef.current = state;
     setCurrentGame(state);
+    setGameHistory([]); // Reset history for new game
     return state;
   };
   
@@ -322,6 +350,15 @@ export default function AIBattle() {
           const newHands = [...state.hands];
           newHands[aiPlayer] = newHands[aiPlayer].filter(c => c.id !== attackCard.id);
           
+          // Record move for learning
+          setGameHistory(prev => [...prev, {
+            phase: 'attack',
+            card: attackCard,
+            handSize: state.hands[aiPlayer].length,
+            tableState: state.tableCards,
+            decisionType: 'attack'
+          }]);
+          
           return {
             hands: newHands,
             tableCards: [{ attack: attackCard, defense: null }],
@@ -358,6 +395,15 @@ export default function AIBattle() {
           if (attackCard && attackCard.id) {
             const newHands = [...state.hands];
             newHands[aiPlayer] = newHands[aiPlayer].filter(c => c.id !== attackCard.id);
+            
+            // Record move for learning
+            setGameHistory(prev => [...prev, {
+              phase: 'attack',
+              card: attackCard,
+              handSize: state.hands[aiPlayer].length,
+              tableState: state.tableCards,
+              decisionType: 'attack'
+            }]);
             
             return {
               hands: newHands,
@@ -396,6 +442,15 @@ export default function AIBattle() {
           
           const allDefended = newTableCards.every(p => p.defense);
           
+          // Record successful defense
+          setGameHistory(prev => [...prev, {
+            phase: 'defend',
+            card: defenseCard,
+            handSize: state.hands[aiPlayer].length,
+            tableState: state.tableCards,
+            decisionType: 'defense'
+          }]);
+          
           return {
             hands: newHands,
             tableCards: newTableCards,
@@ -403,6 +458,15 @@ export default function AIBattle() {
             moveCount: state.moveCount + 1
           };
         } else {
+          // Record failed defense (taking cards)
+          setGameHistory(prev => [...prev, {
+            phase: 'defend',
+            card: null,
+            handSize: state.hands[aiPlayer].length,
+            tableState: state.tableCards,
+            decisionType: 'take'
+          }]);
+          
           return endRound(state, true);
         }
       }
@@ -502,8 +566,8 @@ export default function AIBattle() {
           
           setSessionAhaScore(newScore);
 
-          // Learn tactics from the game
-          await learnTacticsFromGame(state, winner, state.moveCount);
+          // Learn tactics AND gameplay skills from the game
+          await learnTacticsFromGame(state, winner, state.moveCount, gameHistory);
           
           // Start new game
           state = initGame();
