@@ -45,6 +45,7 @@ export default function AIBattle() {
   const [timeFilter, setTimeFilter] = useState('all');
   const autoSessionMinutes = 2; // Fixed 2-minute auto sessions
   const [sessionStartTime, setSessionStartTime] = useState(null);
+  const [countdown, setCountdown] = useState(0);
   
   const gameRef = useRef(null);
   const isRunningRef = useRef(false);
@@ -124,7 +125,7 @@ export default function AIBattle() {
       confidence: 0.2
     });
     
-    // Try to update existing or create new
+    // Try to update existing or create new - STRICTLY NO DUPLICATES
     for (const newTactic of newTactics) {
       const exactMatch = tactics.find(t => t.tactic_name === newTactic.tactic_name);
       
@@ -146,13 +147,19 @@ export default function AIBattle() {
         } catch (error) {
           console.error('Tactic update failed:', error);
         }
-      } else if (tactics.length < 200 && Math.random() > 0.7) {
-        // Create new experimental tactic (30% chance, max 200 tactics)
-        try {
-          await base44.entities.AHATactic.create(newTactic);
-          queryClient.invalidateQueries({ queryKey: ['ahaTactics'] });
-        } catch (error) {
-          console.error('Tactic creation failed:', error);
+      } else {
+        // ABSOLUTE DUPLICATE CHECK - check ALL tactics from database
+        const allTactics = await base44.entities.AHATactic.list('', 1000);
+        const isDuplicate = allTactics.some(t => t.tactic_name === newTactic.tactic_name);
+        
+        if (!isDuplicate && allTactics.length < 200 && Math.random() > 0.7) {
+          // Create new experimental tactic (30% chance, max 200 tactics)
+          try {
+            await base44.entities.AHATactic.create(newTactic);
+            queryClient.invalidateQueries({ queryKey: ['ahaTactics'] });
+          } catch (error) {
+            console.error('Tactic creation failed:', error);
+          }
         }
       }
     }
@@ -411,6 +418,23 @@ export default function AIBattle() {
     statsRef.current = stats;
     sessionAhaScoreRef.current = sessionAhaScore;
   }, [stats, sessionAhaScore]);
+  
+  // Countdown timer
+  useEffect(() => {
+    if (!isRunning || !sessionStartTime) {
+      setCountdown(0);
+      return;
+    }
+    
+    const updateCountdown = setInterval(() => {
+      const elapsed = Date.now() - sessionStartTime;
+      const targetMs = autoSessionMinutes * 60 * 1000;
+      const remaining = Math.max(0, targetMs - elapsed);
+      setCountdown(Math.ceil(remaining / 1000));
+    }, 1000);
+    
+    return () => clearInterval(updateCountdown);
+  }, [isRunning, sessionStartTime, autoSessionMinutes]);
   
   useEffect(() => {
     if (!isRunning || !sessionStartTime) return;
@@ -780,8 +804,8 @@ export default function AIBattle() {
             <CardTitle className="flex items-center justify-between text-white">
               <span>Live Battle Status</span>
               <div className="flex items-center gap-4">
-                <div className="text-sm text-emerald-400">
-                  🔄 Auto-session every 2 minutes
+                <div className="text-xs text-emerald-400">
+                  🔄 Next collection: {Math.floor(countdown / 60)}:{(countdown % 60).toString().padStart(2, '0')}
                 </div>
                 <div className="flex items-center gap-2">
                   <span className="text-sm text-slate-400">Speed:</span>
