@@ -59,7 +59,7 @@ export default function Tactics() {
       
       <div className="max-w-6xl mx-auto space-y-6">
         {/* Stats */}
-        <div className="grid md:grid-cols-3 gap-4">
+        <div className="grid md:grid-cols-2 gap-4">
           <Card className="bg-gradient-to-br from-amber-900/40 to-amber-800/30 border-amber-700/50">
             <CardContent className="p-6">
               <div className="flex items-center justify-between mb-2">
@@ -68,17 +68,6 @@ export default function Tactics() {
               </div>
               <div className="text-3xl font-bold text-white mb-1">{tactics.length}</div>
               <div className="text-sm text-slate-400">Learned Strategies</div>
-            </CardContent>
-          </Card>
-          
-          <Card className="bg-gradient-to-br from-emerald-900/40 to-emerald-800/30 border-emerald-700/50">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between mb-2">
-                <TrendingUp className="w-5 h-5 text-emerald-400" />
-                <span className="text-xs text-emerald-400">SUCCESS</span>
-              </div>
-              <div className="text-3xl font-bold text-white mb-1">{avgSuccessRate}%</div>
-              <div className="text-sm text-slate-400">Avg Win Rate</div>
             </CardContent>
           </Card>
           
