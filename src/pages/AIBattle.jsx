@@ -17,6 +17,10 @@ import {
 import { Link } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
 
+import Card from '@/components/durak/Card';
+import TrumpIndicator from '@/components/durak/TrumpIndicator';
+import AIHand from '@/components/durak/AIHand';
+
 import {
   createDeck,
   dealCards,
