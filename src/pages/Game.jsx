@@ -219,7 +219,16 @@ export default function Game() {
     
     const timer = setTimeout(() => {
       const state = gameRef.current;
-      if (!state) return;
+      if (!state) {
+        setAiThinking(null);
+        return;
+      }
+      
+      // Safety check - prevent infinite loops
+      if (state.hands[aiPlayer].length === 0) {
+        setAiThinking(null);
+        return;
+      }
       
       const aiDifficulty = difficulty;
       
@@ -247,6 +256,10 @@ export default function Game() {
               phase: 'defend'
             });
             setGameMessage('Defend against the attack!');
+          } else {
+            // AI has no valid attack, pass turn
+            setAiThinking(null);
+            endRound(false);
           }
         } else {
           // Continue attack or end - using learned patterns
@@ -328,7 +341,8 @@ export default function Game() {
           } else {
             // Take cards
             setGameMessage('AI takes the cards!');
-            setTimeout(() => endRound(true), AI_DELAY);
+            setAiThinking(null);
+            setTimeout(() => endRound(true), 500);
           }
         }
       }
