@@ -826,12 +826,12 @@ export default function AIBattle() {
                       labelFormatter={(label) => new Date(label).toLocaleString()}
                     />
                     <Line 
-                      type="monotone" 
+                      type="linear" 
                       dataKey="win_rate" 
                       stroke="#06b6d4" 
-                      strokeWidth={3}
-                      dot={{ fill: '#06b6d4', r: 4 }}
-                      activeDot={{ r: 6 }}
+                      strokeWidth={2}
+                      dot={{ fill: '#06b6d4', r: 3 }}
+                      activeDot={{ r: 5 }}
                     />
                   </LineChart>
                 </ResponsiveContainer>
