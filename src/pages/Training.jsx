@@ -200,6 +200,27 @@ export default function Training() {
           const newHands = [...state.hands];
           newHands[aiPlayer] = newHands[aiPlayer].filter(c => c.id !== attackCard.id);
           
+          // Batch knowledge creation
+          knowledgeBatchRef.current.push({
+            game_id: `game_${gamesPlayed}`,
+            move_number: state.tableCards.length + 1,
+            game_phase: 'attack',
+            card_played: attackCard,
+            hand_size: newHands[aiPlayer].length,
+            table_state: JSON.stringify(state.tableCards),
+            decision_type: 'attack',
+            was_successful: true,
+            reward: 0.3,
+            aha_score_at_time: ahaScore,
+            strategy_snapshot: strategyWeights
+          });
+          
+          // Save batch every 50 moves
+          if (knowledgeBatchRef.current.length >= 50) {
+            base44.entities.AIKnowledge.bulkCreate([...knowledgeBatchRef.current]).catch(() => {});
+            knowledgeBatchRef.current = [];
+          }
+          
           const newState = {
             ...state,
             hands: newHands,
@@ -278,6 +299,27 @@ export default function Training() {
             successfulDefenses: prev.successfulDefenses + 1
           }));
           
+          // Batch knowledge creation
+          knowledgeBatchRef.current.push({
+            game_id: `game_${gamesPlayed}`,
+            move_number: state.tableCards.length,
+            game_phase: 'defend',
+            card_played: defenseCard,
+            hand_size: newHands[aiPlayer].length,
+            table_state: JSON.stringify(state.tableCards),
+            decision_type: 'defense',
+            was_successful: true,
+            reward: 0.5,
+            aha_score_at_time: ahaScore,
+            strategy_snapshot: strategyWeights
+          });
+          
+          // Save batch every 50 moves
+          if (knowledgeBatchRef.current.length >= 50) {
+            base44.entities.AIKnowledge.bulkCreate([...knowledgeBatchRef.current]).catch(() => {});
+            knowledgeBatchRef.current = [];
+          }
+          
           const newState = {
             ...state,
             hands: newHands,
@@ -295,6 +337,26 @@ export default function Training() {
             ...prev,
             totalDefenses: prev.totalDefenses + 1
           }));
+          
+          // Batch knowledge creation
+          knowledgeBatchRef.current.push({
+            game_id: `game_${gamesPlayed}`,
+            move_number: state.tableCards.length,
+            game_phase: 'defend',
+            hand_size: state.hands[aiPlayer].length,
+            table_state: JSON.stringify(state.tableCards),
+            decision_type: 'take',
+            was_successful: false,
+            reward: -0.8,
+            aha_score_at_time: ahaScore,
+            strategy_snapshot: strategyWeights
+          });
+          
+          // Save batch every 50 moves
+          if (knowledgeBatchRef.current.length >= 50) {
+            base44.entities.AIKnowledge.bulkCreate([...knowledgeBatchRef.current]).catch(() => {});
+            knowledgeBatchRef.current = [];
+          }
 
           if (!skipStateUpdate) {
             setCurrentAction(`AI ${aiPlayer + 1} takes cards`);
@@ -453,9 +515,15 @@ export default function Training() {
       setTimeout(() => {
         clearInterval(analysisInterval);
 
+        // Save any remaining batched knowledge
+        if (knowledgeBatchRef.current.length > 0) {
+          base44.entities.AIKnowledge.bulkCreate([...knowledgeBatchRef.current]).catch(() => {});
+          knowledgeBatchRef.current = [];
+        }
+
         // Create MASSIVE knowledge database
         const knowledgeBatch = [];
-        const recordCount = 500;
+        const recordCount = 1000;
 
         for (let i = 0; i < recordCount; i++) {
           const phase = ['attack', 'defend'][Math.floor(Math.random() * 2)];
