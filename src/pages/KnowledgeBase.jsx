@@ -21,51 +21,48 @@ import { createPageUrl } from '@/utils';
 export default function KnowledgeBase() {
   const [selectedFilter, setSelectedFilter] = useState('all');
   
-  // Pre-filled world-class AI stats
-  const currentData = {
-    aha_score: 25000,
-    games_played: 250000,
-    games_won: 232500,
-    successful_defenses: 195000,
-    successful_attacks: 210000,
-    total_moves: 3750000,
-    strategy_weights: {
-      aggressive_factor: 2.2,
-      trump_conservation: 2.3,
-      card_value_threshold: 7
-    }
-  };
+  // Load AI training data
+  const { data: trainingData = [] } = useQuery({
+    queryKey: ['aiTraining'],
+    queryFn: () => base44.entities.AITrainingData.list(),
+    initialData: []
+  });
   
-  // Generate impressive knowledge display
-  const knowledgeData = [
-    { id: 1, game_id: 'master_1', move_number: 1, game_phase: 'attack', card_played: { rank: 6, suit: 'hearts' }, hand_size: 6, decision_type: 'attack', was_successful: true, reward: 0.82, aha_score_at_time: 24500 },
-    { id: 2, game_id: 'master_1', move_number: 2, game_phase: 'defend', card_played: { rank: 7, suit: 'hearts' }, hand_size: 5, decision_type: 'defense', was_successful: true, reward: 0.91, aha_score_at_time: 24550 },
-    { id: 3, game_id: 'master_2', move_number: 1, game_phase: 'attack', card_played: { rank: 8, suit: 'diamonds' }, hand_size: 6, decision_type: 'attack', was_successful: true, reward: 0.88, aha_score_at_time: 24600 },
-    { id: 4, game_id: 'master_2', move_number: 3, game_phase: 'defend', card_played: { rank: 11, suit: 'spades' }, hand_size: 4, decision_type: 'defense', was_successful: true, reward: 0.95, aha_score_at_time: 24680 },
-    { id: 5, game_id: 'master_3', move_number: 1, game_phase: 'attack', card_played: { rank: 7, suit: 'clubs' }, hand_size: 6, decision_type: 'attack', was_successful: true, reward: 0.79, aha_score_at_time: 24750 },
-    { id: 6, game_id: 'master_3', move_number: 4, game_phase: 'attack', card_played: { rank: 9, suit: 'hearts' }, hand_size: 3, decision_type: 'attack', was_successful: true, reward: 0.93, aha_score_at_time: 24820 },
-    { id: 7, game_id: 'master_4', move_number: 2, game_phase: 'defend', card_played: { rank: 12, suit: 'diamonds' }, hand_size: 5, decision_type: 'defense', was_successful: true, reward: 0.89, aha_score_at_time: 24890 },
-    { id: 8, game_id: 'master_5', move_number: 1, game_phase: 'attack', card_played: { rank: 6, suit: 'spades' }, hand_size: 6, decision_type: 'attack', was_successful: true, reward: 0.85, aha_score_at_time: 24920 },
-    { id: 9, game_id: 'master_5', move_number: 5, game_phase: 'attack', card_played: { rank: 14, suit: 'clubs' }, hand_size: 2, decision_type: 'attack', was_successful: true, reward: 0.97, aha_score_at_time: 24995 },
-    { id: 10, game_id: 'master_6', move_number: 3, game_phase: 'defend', card_played: { rank: 10, suit: 'hearts' }, hand_size: 4, decision_type: 'defense', was_successful: true, reward: 0.92, aha_score_at_time: 25000 },
-  ];
+  // Load AI knowledge (moves/decisions)
+  const { data: knowledgeData = [] } = useQuery({
+    queryKey: ['aiKnowledge'],
+    queryFn: () => base44.entities.AIKnowledge.list('-created_date', 500),
+    initialData: []
+  });
   
-  // Calculate statistics from world-class data
+  const currentData = trainingData.length > 0 ? trainingData[0] : null;
+  
+  // Calculate statistics
   const stats = {
-    totalMoves: currentData.total_moves,
-    successfulMoves: Math.floor(currentData.total_moves * 0.93),
-    attackMoves: currentData.successful_attacks,
-    defenseMoves: currentData.successful_defenses,
-    avgReward: 0.881
+    totalMoves: knowledgeData.length,
+    successfulMoves: knowledgeData.filter(k => k.was_successful).length,
+    attackMoves: knowledgeData.filter(k => k.decision_type === 'attack').length,
+    defenseMoves: knowledgeData.filter(k => k.decision_type === 'defense').length,
+    avgReward: knowledgeData.length > 0 
+      ? (knowledgeData.reduce((sum, k) => sum + (k.reward || 0), 0) / knowledgeData.length).toFixed(3)
+      : 0
   };
   
-  const successRate = 93.0;
+  const successRate = stats.totalMoves > 0 
+    ? ((stats.successfulMoves / stats.totalMoves) * 100).toFixed(1)
+    : 0;
   
   const filteredKnowledge = selectedFilter === 'all' 
     ? knowledgeData 
     : knowledgeData.filter(k => k.decision_type === selectedFilter);
     
-  const displayBest = knowledgeData.slice(0, 10);
+  // Find best decisions
+  const bestDecisions = [...knowledgeData]
+    .filter(k => k.card_played && k.reward > 0.5 && k.was_successful)
+    .sort((a, b) => b.reward - a.reward)
+    .slice(0, 10);
+  
+  const displayBest = bestDecisions;
   
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-900 via-purple-950 to-slate-900 p-4">
@@ -101,7 +98,7 @@ export default function KnowledgeBase() {
                 <span className="text-xs text-purple-400">PERFORMANCE</span>
               </div>
               <div className="text-3xl font-bold text-white mb-1">
-                {currentData.aha_score.toLocaleString()}
+                {currentData?.aha_score?.toLocaleString() || 0}
               </div>
               <div className="text-sm text-slate-400">AHA Score</div>
             </CardContent>
@@ -114,7 +111,7 @@ export default function KnowledgeBase() {
                 <span className="text-xs text-emerald-400">TRAINING</span>
               </div>
               <div className="text-3xl font-bold text-white mb-1">
-                {currentData.games_played.toLocaleString()}
+                {currentData?.games_played?.toLocaleString() || 0}
               </div>
               <div className="text-sm text-slate-400">Games Played</div>
             </CardContent>
@@ -148,7 +145,7 @@ export default function KnowledgeBase() {
         </div>
         
         {/* Strategy Parameters */}
-        {currentData.strategy_weights && (
+        {currentData?.strategy_weights && (
           <Card className="bg-slate-800/40 border-slate-700/50">
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-white">
