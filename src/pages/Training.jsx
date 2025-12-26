@@ -190,17 +190,8 @@ export default function Training() {
     const aiPlayer = state.phase === 'attack' ? state.attacker : state.defender;
     const difficulty = 'aha';
     
-    // Query learned knowledge for similar situations
+    // Don't query during training - too slow
     let learnedData = null;
-    if (ahaScore > 100) {
-      try {
-        const recentKnowledge = await base44.entities.AIKnowledge.filter({
-          decision_type: state.phase === 'attack' ? 'attack' : 'defense',
-          was_successful: true
-        }, '-reward', 20);
-        learnedData = recentKnowledge;
-      } catch (e) {}
-    }
     
     if (state.phase === 'attack') {
       if (state.tableCards.length === 0) {
@@ -208,21 +199,6 @@ export default function Training() {
         if (attackCard) {
           const newHands = [...state.hands];
           newHands[aiPlayer] = newHands[aiPlayer].filter(c => c.id !== attackCard.id);
-          
-          // Log attack knowledge
-          base44.entities.AIKnowledge.create({
-            game_id: `game_${gamesPlayed}`,
-            move_number: state.tableCards.length + 1,
-            game_phase: 'attack',
-            card_played: attackCard,
-            hand_size: newHands[aiPlayer].length,
-            table_state: JSON.stringify(state.tableCards),
-            decision_type: 'attack',
-            was_successful: true,
-            reward: 0.3,
-            aha_score_at_time: ahaScore,
-            strategy_snapshot: strategyWeights
-          }).catch(() => {});
           
           const newState = {
             ...state,
@@ -302,21 +278,6 @@ export default function Training() {
             successfulDefenses: prev.successfulDefenses + 1
           }));
           
-          // Log defense knowledge
-          base44.entities.AIKnowledge.create({
-            game_id: `game_${gamesPlayed}`,
-            move_number: state.tableCards.length,
-            game_phase: 'defend',
-            card_played: defenseCard,
-            hand_size: newHands[aiPlayer].length,
-            table_state: JSON.stringify(state.tableCards),
-            decision_type: 'defense',
-            was_successful: true,
-            reward: 0.5,
-            aha_score_at_time: ahaScore,
-            strategy_snapshot: strategyWeights
-          }).catch(() => {});
-          
           const newState = {
             ...state,
             hands: newHands,
@@ -334,20 +295,6 @@ export default function Training() {
             ...prev,
             totalDefenses: prev.totalDefenses + 1
           }));
-          
-          // Log failed defense knowledge
-          base44.entities.AIKnowledge.create({
-            game_id: `game_${gamesPlayed}`,
-            move_number: state.tableCards.length,
-            game_phase: 'defend',
-            hand_size: state.hands[aiPlayer].length,
-            table_state: JSON.stringify(state.tableCards),
-            decision_type: 'take',
-            was_successful: false,
-            reward: -0.8,
-            aha_score_at_time: ahaScore,
-            strategy_snapshot: strategyWeights
-          }).catch(() => {});
 
           if (!skipStateUpdate) {
             setCurrentAction(`AI ${aiPlayer + 1} takes cards`);
