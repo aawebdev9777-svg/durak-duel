@@ -71,8 +71,8 @@ export default function Card({
   if (!card) return null;
 
   const baseClasses = small 
-    ? "w-24 h-16 md:w-28 md:h-18" 
-    : "w-36 h-24 md:w-42 md:h-28";
+    ? "w-16 h-24 md:w-18 md:h-28" 
+    : "w-24 h-36 md:w-28 md:h-42";
   
   const cardImageUrl = cardImages[`${card.suit}-${card.rank}`];
 
