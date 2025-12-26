@@ -229,4 +229,30 @@ export class DurakProbabilityEngine {
     
     return handStrength / 6; // Normalize to 0-1
   }
+
+  // MCTS-inspired: Estimate probability opponent can defend this card
+  estimateDefenseProbability(attackCard, opponentHandSize) {
+    if (opponentHandSize === 0) return 0;
+    
+    const unknownCards = this.unknownCards;
+    const totalUnknown = unknownCards.length;
+    if (totalUnknown === 0) return 0.5;
+    
+    // Count cards that can beat this attack
+    let canBeatCount = 0;
+    unknownCards.forEach(card => {
+      if (this.canBeat(attackCard, card)) {
+        canBeatCount++;
+      }
+    });
+    
+    // Probability at least one defense card in opponent's hand
+    const probPerCard = canBeatCount / totalUnknown;
+    const probNoDefense = Math.pow(1 - probPerCard, opponentHandSize);
+    return 1 - probNoDefense;
+  }
+
+  getUnknownCards() {
+    return this.unknownCards;
+  }
 }
