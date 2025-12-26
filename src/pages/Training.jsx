@@ -385,21 +385,21 @@ export default function Training() {
                 }));
               }
               
-              // Update UI every 100 games
-              if (localGamesCount % 100 === 0) {
-                setGamesPlayed(prev => prev + 100);
+              // Update UI every 10 games for real-time feedback
+              if (localGamesCount % 10 === 0) {
+                setGamesPlayed(prev => prev + 10);
                 setStats(prev => ({
                   ai1Wins: prev.ai1Wins + localStats.ai1Wins,
                   ai2Wins: prev.ai2Wins + localStats.ai2Wins,
                   draws: prev.draws + localStats.draws
                 }));
                 localStats = { ai1Wins: 0, ai2Wins: 0, draws: 0 };
+                setCurrentAction(`⚡ ${gamesPlayed + localGamesCount} total games played!`);
               }
               
-              // Update UI every 10,000 games with current state
-              if (localGamesCount % 10000 === 0 && gameRef.current) {
+              // Update visual state occasionally
+              if (localGamesCount % 100 === 0 && gameRef.current) {
                 setGameState({...gameRef.current});
-                setCurrentAction(`🔥 ${localGamesCount} games in this batch!`);
               }
               
               initGame();
@@ -440,9 +440,9 @@ export default function Training() {
     };
   }, [isRunning, speed, unvisMode, executeAITurn, initGame, strategyWeights, gamesPlayed]);
   
-  // Auto-analyze and save every 1000 games
+  // Auto-analyze and save every 100 games
   useEffect(() => {
-    if (gamesPlayed > 0 && gamesPlayed % 1000 === 0 && !isAnalyzing) {
+    if (gamesPlayed > 0 && gamesPlayed % 100 === 0 && !isAnalyzing) {
       setIsAnalyzing(true);
       setAnalysisProgress(0);
 
@@ -665,9 +665,9 @@ export default function Training() {
             )}
           </div>
           <div className="bg-slate-800/50 rounded-xl p-4 text-center border border-slate-700">
-            <div className="text-2xl font-bold text-white">{gamesPlayed}/100</div>
+            <div className="text-2xl font-bold text-white">{gamesPlayed}</div>
             <div className="text-xs text-slate-400">
-              {language === 'ru' ? 'Игры' : 'Games'}
+              {language === 'ru' ? 'Игры (до сохранения)' : 'Games (until save)'}
             </div>
           </div>
           <div className="bg-emerald-900/30 rounded-xl p-4 text-center border border-emerald-700/50">
@@ -889,8 +889,8 @@ export default function Training() {
           </p>
           <p className="text-xs text-slate-600">
             💡 {language === 'ru' 
-              ? 'Система автоматически обрабатывает данные каждые 100 игр. АХА начинается с 0 и медленно растёт с тысячами игр. 10,000+ = мирового уровня!'
-              : 'System analyzes every 100 games. AHA starts at 0 and grows slowly over thousands of games. 10,000+ = World Champion!'}
+              ? 'Система сохраняет данные каждые 100 игр. Используйте UNVIS для максимальной скорости!'
+              : 'System saves every 100 games. Use UNVIS for maximum speed!'}
           </p>
         </div>
       </div>
