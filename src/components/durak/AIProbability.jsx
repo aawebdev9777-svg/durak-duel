@@ -232,7 +232,7 @@ export class DurakProbabilityEngine {
 
   // MCTS-inspired: Estimate probability opponent can defend this card
   estimateDefenseProbability(attackCard, opponentHandSize) {
-    if (opponentHandSize === 0) return 0;
+    if (!attackCard || !attackCard.suit || opponentHandSize === 0) return 0;
     
     const unknownCards = this.unknownCards;
     const totalUnknown = unknownCards.length;

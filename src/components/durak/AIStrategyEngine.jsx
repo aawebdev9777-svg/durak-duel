@@ -123,6 +123,8 @@ export class AIStrategyEngine {
       let bestScore = -Infinity;
       
       for (const card of candidates) {
+        if (!card || !card.suit || !card.rank) continue;
+        
         let score = 0;
         
         // 1. Card value (lower is better for attack)
@@ -171,6 +173,8 @@ export class AIStrategyEngine {
       let bestScore = Infinity;
       
       for (const card of validDefenses) {
+        if (!card || !card.suit || !card.rank) continue;
+        
         let score = 0;
         
         // 1. Minimize card value spent
