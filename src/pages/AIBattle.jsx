@@ -313,7 +313,8 @@ export default function AIBattle() {
           weights,
           learnedData,
           state.deck.length,
-          state.hands[state.defender]?.length || 0
+          state.hands[state.defender]?.length || 0,
+          tactics
         );
         
         if (attackCard && attackCard.id) {
@@ -349,7 +350,8 @@ export default function AIBattle() {
             weights,
             learnedData,
             state.deck.length,
-            state.hands[state.defender]?.length || 0
+            state.hands[state.defender]?.length || 0,
+            tactics
           );
           
           if (attackCard && attackCard.id) {
@@ -378,7 +380,8 @@ export default function AIBattle() {
           weights,
           learnedData,
           state.deck.length,
-          state.hands[state.attacker]?.length || 0
+          state.hands[state.attacker]?.length || 0,
+          tactics
         );
         
         if (defenseCard && defenseCard.id) {
