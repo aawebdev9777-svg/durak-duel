@@ -104,11 +104,16 @@ export class AIStrategyEngine {
     const { trumpSuit, tableCards, deckSize, opponentHandSize, ourHandSize } = gameState;
     const prob = new DurakProbabilityEngine(trumpSuit, deckSize, this.getVisibleCards(hand, tableCards));
     
-    // PRIORITY 1: APPLY LEARNED TACTICS (80% priority)
+    // PRIORITY 1: APPLY LEARNED TACTICS (95% priority for high confidence tactics)
     if (this.tactics && this.tactics.length > 0) {
       const tacticDecision = this.applyTactics(hand, gameState, action, trumpSuit);
-      if (tacticDecision && Math.random() < 0.8) {
-        return tacticDecision;
+      if (tacticDecision) {
+        // Use tactics more aggressively based on their quality
+        const highConfidenceTactics = this.tactics.filter(t => (t.confidence || 0) > 0.6 && (t.success_rate || 0) > 0.6);
+        const useRate = highConfidenceTactics.length > 3 ? 0.95 : 0.85;
+        if (Math.random() < useRate) {
+          return tacticDecision;
+        }
       }
     }
     
@@ -145,11 +150,11 @@ export class AIStrategyEngine {
         
         // 3. Learned patterns boost
         const learnedBoost = this.getLearnedCardScore(card, similarSituations, 'attack');
-        score += learnedBoost * 3;
+        score += learnedBoost * 5;
         
         // 4. Duplicate rank bonus (setup for multi-attack)
         const duplicates = hand.filter(c => c.rank === card.rank).length;
-        score += (duplicates - 1) * 2;
+        score += (duplicates - 1) * 3;
         
         // 5. Greedy endgame strategy
         if (deckSize === 0 && ourHandSize <= 3) {
@@ -201,7 +206,7 @@ export class AIStrategyEngine {
         
         // 4. Learned pattern penalty/bonus
         const learnedScore = this.getLearnedCardScore(card, similarSituations, 'defense');
-        score -= learnedScore * 2;
+        score -= learnedScore * 4;
         
         // 5. Endgame considerations
         if (deckSize === 0) {
@@ -418,13 +423,14 @@ export class AIStrategyEngine {
     // Find applicable tactics sorted by success rate and confidence
     const applicableTactics = this.tactics.filter(t => 
       t.scenario?.phase === action &&
-      Math.abs((t.scenario.hand_size || 0) - ourHandSize) <= 2 &&
-      Math.abs((t.scenario.deck_remaining || 0) - deckSize) <= 15 &&
-      (t.success_rate || 0) > 0.4 &&
-      (t.confidence || 0) > 0.3
+      Math.abs((t.scenario.hand_size || 0) - ourHandSize) <= 3 &&
+      Math.abs((t.scenario.deck_remaining || 0) - deckSize) <= 20 &&
+      (t.success_rate || 0) > 0.35 &&
+      (t.confidence || 0) > 0.2
     ).sort((a, b) => {
-      const scoreA = (a.success_rate || 0) * (a.confidence || 0) * (a.times_won || 1);
-      const scoreB = (b.success_rate || 0) * (b.confidence || 0) * (b.times_won || 1);
+      // Heavily weight recent wins and confidence
+      const scoreA = (a.success_rate || 0) * Math.pow((a.confidence || 0), 1.5) * Math.sqrt(a.times_won || 1);
+      const scoreB = (b.success_rate || 0) * Math.pow((b.confidence || 0), 1.5) * Math.sqrt(b.times_won || 1);
       return scoreB - scoreA;
     });
     

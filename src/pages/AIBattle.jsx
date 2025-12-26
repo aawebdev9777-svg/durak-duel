@@ -36,7 +36,7 @@ export default function AIBattle() {
   const [isRunning, setIsRunning] = useState(false);
   const [stats, setStats] = useState({ ahaWins: 0, opponentWins: 0, draws: 0, totalGames: 0 });
   const [currentGame, setCurrentGame] = useState(null);
-  const [speed, setSpeed] = useState(100); // ms per move
+  const [speed, setSpeed] = useState(10); // ms per move - fast by default
   const [learnedData, setLearnedData] = useState(null);
   const [matchHistory, setMatchHistory] = useState([]);
   
@@ -166,8 +166,8 @@ export default function AIBattle() {
           const newSuccessRate = newTimesWon / newTimesUsed;
 
           // Confidence grows significantly with wins, drops slightly with losses
-          let confidenceChange = wonGame ? 0.08 : -0.03;
-          const newConfidence = Math.max(0.1, Math.min(0.99, existingTactic.confidence + confidenceChange));
+          let confidenceChange = wonGame ? 0.12 : -0.02;
+          const newConfidence = Math.max(0.15, Math.min(0.99, existingTactic.confidence + confidenceChange));
 
           try {
             await base44.entities.AHATactic.update(existingTactic.id, {
