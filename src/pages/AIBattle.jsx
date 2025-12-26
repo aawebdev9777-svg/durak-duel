@@ -15,7 +15,7 @@ import {
   Brain,
   Activity
 } from 'lucide-react';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts';
 import { Link } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
 
@@ -824,6 +824,13 @@ export default function AIBattle() {
                       }}
                       formatter={(value) => [`${value.toFixed(1)}%`, 'Win Rate']}
                       labelFormatter={(label) => new Date(label).toLocaleString()}
+                    />
+                    <ReferenceLine 
+                      y={75} 
+                      stroke="#10b981" 
+                      strokeDasharray="5 5" 
+                      strokeWidth={2}
+                      label={{ value: 'Target: 75%', position: 'right', fill: '#10b981', fontSize: 12 }}
                     />
                     <Line 
                       type="linear" 
