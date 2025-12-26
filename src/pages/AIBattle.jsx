@@ -36,7 +36,7 @@ export default function AIBattle() {
   const [isRunning, setIsRunning] = useState(false);
   const [stats, setStats] = useState({ ahaWins: 0, opponentWins: 0, totalGames: 0 });
   const [currentGame, setCurrentGame] = useState(null);
-  const [speed, setSpeed] = useState(100); // ms per move
+  const [speed, setSpeed] = useState(10); // ms per move - fast by default
   const [learnedData, setLearnedData] = useState(null);
   const [matchHistory, setMatchHistory] = useState([]);
   
@@ -148,7 +148,7 @@ export default function AIBattle() {
 
       for (const existingTactic of tactics) {
         const similarity = calculateTacticSimilarity(existingTactic, newTactic);
-        if (similarity > 0.65) {
+        if (similarity > 0.7) {
           foundSimilar = true;
           const newTimesUsed = existingTactic.times_used + 1;
           const newTimesWon = existingTactic.times_won + (wonGame ? 1 : 0);
@@ -187,18 +187,29 @@ export default function AIBattle() {
   };
   
   const calculateTacticSimilarity = (tactic1, tactic2) => {
-    if (!tactic1.scenario || !tactic2.scenario) return 0;
-    
+    if (!tactic1.scenario || !tactic2.scenario || !tactic1.action || !tactic2.action) return 0;
+
+    // Exact name match = duplicate
+    if (tactic1.tactic_name === tactic2.tactic_name) return 1.0;
+
     const handDiff = Math.abs((tactic1.scenario.hand_size || 0) - (tactic2.scenario.hand_size || 0));
     const deckDiff = Math.abs((tactic1.scenario.deck_remaining || 0) - (tactic2.scenario.deck_remaining || 0));
-    
-    let similarity = 1.0;
-    similarity -= handDiff * 0.1;
-    similarity -= deckDiff * 0.01;
-    
-    if (tactic1.scenario.phase === tactic2.scenario.phase) similarity += 0.2;
-    
-    return Math.max(0, similarity);
+
+    let similarity = 0.0;
+
+    // Same phase is important
+    if (tactic1.scenario.phase === tactic2.scenario.phase) similarity += 0.3;
+
+    // Same action type is important
+    if (tactic1.action.type === tactic2.action.type) similarity += 0.3;
+
+    // Similar hand size
+    if (handDiff <= 1) similarity += 0.2;
+
+    // Similar deck remaining
+    if (deckDiff <= 5) similarity += 0.2;
+
+    return similarity;
   };
   
   // Save training mutation with tactic learning
@@ -442,10 +453,10 @@ export default function AIBattle() {
           
           // Update AHA score
           const currentScore = trainingData.length > 0 ? trainingData[0].aha_score : 0;
-          // Update AHA score in training data for display purposes only
+          // Update AHA score based on performance
           const newScore = winner === 'aha' 
-            ? Math.min(50000, currentScore + 20)
-            : Math.max(0, currentScore - 5);
+            ? currentScore + 50
+            : Math.max(0, currentScore - 10);
 
           // Learn tactics from the game
           await learnTacticsFromGame(state, winner, state.moveCount);
