@@ -154,39 +154,47 @@ export default function Game() {
       newHands[state.defender] = [...newHands[state.defender], ...allCards];
     }
     
-    const { hands: refilledHands, remainingDeck } = refillHands(
-      newHands, 
-      state.deck, 
-      state.attacker
-    );
+    // Refill hands ONLY if deck has cards
+    let refilledHands = newHands;
+    let remainingDeck = state.deck;
     
-    const deckEmpty = remainingDeck.length === 0 && !state.trumpCard;
+    if (state.deck.length > 0) {
+      const refillResult = refillHands(newHands, state.deck, state.attacker);
+      refilledHands = refillResult.hands;
+      remainingDeck = refillResult.remainingDeck;
+    }
+    
+    // Check game over - deck empty AND at least one player has no cards
+    const deckEmpty = remainingDeck.length === 0;
     
     if (checkAndHandleGameOver(refilledHands, deckEmpty)) {
-      updateGameState({ hands: refilledHands, deck: remainingDeck, tableCards: [] });
+      updateGameState({ hands: refilledHands, deck: remainingDeck, tableCards: [], trumpCard: deckEmpty ? null : state.trumpCard });
       return;
     }
     
     const numPlayers = refilledHands.length;
     let nextAttacker, nextDefender;
     
-    if (defenderTook) {
-      nextAttacker = (state.defender + 1) % numPlayers;
+    // PROPER DURAK RULES: If defender successfully defended, they become attacker
+    if (!defenderTook) {
+      nextAttacker = state.defender; // Successful defender becomes attacker
       nextDefender = (nextAttacker + 1) % numPlayers;
     } else {
-      nextAttacker = state.defender;
-      nextDefender = (nextAttacker + 1) % numPlayers;
+      // If defender took cards, attacker stays attacker, next player becomes defender
+      nextAttacker = state.attacker;
+      nextDefender = (state.defender + 1) % numPlayers;
     }
     
-    // Skip players with no cards
-    while (refilledHands[nextAttacker].length === 0) {
-      nextAttacker = (nextAttacker + 1) % numPlayers;
-      if (nextAttacker === state.defender) break;
-    }
-    nextDefender = (nextAttacker + 1) % numPlayers;
-    while (refilledHands[nextDefender].length === 0) {
-      nextDefender = (nextDefender + 1) % numPlayers;
-      if (nextDefender === nextAttacker) break;
+    // Skip players with no cards (after deck is empty)
+    if (deckEmpty) {
+      while (refilledHands[nextAttacker]?.length === 0) {
+        nextAttacker = (nextAttacker + 1) % numPlayers;
+        if (nextAttacker === state.attacker) break;
+      }
+      while (refilledHands[nextDefender]?.length === 0) {
+        nextDefender = (nextDefender + 1) % numPlayers;
+        if (nextDefender === nextAttacker) break;
+      }
     }
     
     updateGameState({
@@ -201,7 +209,13 @@ export default function Game() {
     });
     
     setSelectedCard(null);
-    setGameMessage(nextAttacker === 0 ? 'Your turn to attack!' : 'AI is attacking...');
+    
+    // Better messaging based on who's attacking
+    if (nextAttacker === 0) {
+      setGameMessage(deckEmpty ? 'Your turn to attack! (No more cards to draw)' : 'Your turn to attack!');
+    } else {
+      setGameMessage(deckEmpty ? 'AI is attacking... (No more cards to draw)' : 'AI is attacking...');
+    }
   }, [updateGameState, checkAndHandleGameOver]);
   
   // AI Logic
